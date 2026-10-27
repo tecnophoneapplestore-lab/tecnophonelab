@@ -298,6 +298,8 @@ a.icon-btn{text-decoration:none}
   .wa-card{padding:36px 32px;justify-content:center}
   .sedes{grid-template-columns:1fr;align-content:stretch}
 }
+.diag{margin:12px 0;padding:14px 16px;border-radius:18px;font-size:13px;line-height:1.5;color:#5b3a00;background:rgba(255,236,200,.85);border:1px solid rgba(208,138,30,.35)}
+.diag span{color:#8a6a2a}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .top{background:rgba(255,255,255,.94)} .dock{background:rgba(18,26,31,.94)} .sheet{background:#F7FAFB}
 }
@@ -414,14 +416,14 @@ const IC = {
 };
 
 /* ---------------- estado ---------------- */
-const ST = { items: [], site: brandSite({}), at: '', cat: 'all', q: '', loaded: false, error: null, fetchedAt: 0, logo: '' };
+const ST = { items: [], site: brandSite({}), at: '', fallback: false, diag: '', cat: 'all', q: '', loaded: false, error: null, fetchedAt: 0, logo: '' };
 const IMG = {};                 /* id → dataURL · false = no existe (fotos subidas en el admin) */
 const imgQ = new Set(), inflight = new Set(); let imgT = null;
 
 /* ---------------- datos ---------------- */
 async function rest(qs) {
   const r = await fetch(CFG.url + '/rest/v1/ep_store' + qs, { headers: { apikey: CFG.key, Authorization: 'Bearer ' + CFG.key, Accept: 'application/json' }, cache: 'no-store' });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
+  if (!r.ok) { let b = ''; try { b = (await r.text()).slice(0, 220); } catch (e) { } const e = new Error('HTTP ' + r.status + ' ' + b); e.status = r.status; e.body = b; throw e; }
   return r.json();
 }
 const inList = arr => 'in.' + encodeURIComponent('(' + arr.map(x => '"' + String(x).replace(/"/g, '') + '"').join(',') + ')');
@@ -450,22 +452,46 @@ function normalize(raw) {
   return items;
 }
 
+/* Catálogo de respaldo: se muestra solo si Supabase no responde o aún no tiene el catálogo publicado */
+const FALLBACK = {"at":"2026-10-27T00:00:00Z","items":{"TP-AUD-0001":{"id":"tp-aud-0001","name":"Audífonos 01","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1CgO09RsHCl3YHki8MONkYan9bzBvkGIu&sz=w800","ref":"TP-AUD-0001","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-AUD-0002":{"id":"tp-aud-0002","name":"Audífonos 02","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=11MavKXz1r1Z0FB9OJTVhVbVoON9bs6sp&sz=w800","ref":"TP-AUD-0002","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-AUD-0003":{"id":"tp-aud-0003","name":"Audífonos 03","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=10KsZ5TICSXV7CSSYStH1GuSzWzvGUMSW&sz=w800","ref":"TP-AUD-0003","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-AUD-0004":{"id":"tp-aud-0004","name":"Audífonos 04","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1c_6Mp4WgLx5BRH_9tiovkURzkPnwppbX&sz=w800","ref":"TP-AUD-0004","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-AUD-0005":{"id":"tp-aud-0005","name":"Audífonos 05","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1JBjtn2CcZNGSkYOGYzww04breD6D3dfd&sz=w800","ref":"TP-AUD-0005","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-AUD-0006":{"id":"tp-aud-0006","name":"Audífonos 06","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1xhVFsMCtQMyXvUt5bUHqUm0EMeJYkIAK&sz=w800","ref":"TP-AUD-0006","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-AUD-0007":{"id":"tp-aud-0007","name":"Audífonos 07","cat":"Audífonos","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1AmZufdRrYRhm8h7_haXJtLt1jlSIwcnr&sz=w800","ref":"TP-AUD-0007","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-APP-0008":{"id":"tp-app-0008","name":"Apple Pencil","cat":"Apple Pencil","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=122t9Kisd_2B6OeFT7JvuhvXGjHnxN4g-&sz=w800","ref":"TP-APP-0008","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-CAB-0009":{"id":"tp-cab-0009","name":"Cable 01","cat":"Cables","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1iub5uDts_0D61ozUz8goY4qM9uFZACFZ&sz=w800","ref":"TP-CAB-0009","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-CAB-0010":{"id":"tp-cab-0010","name":"Cable 02","cat":"Cables","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=16vOfb57dMkqIU2iLcy3XLKHeLKphF2pu&sz=w800","ref":"TP-CAB-0010","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-CAB-0011":{"id":"tp-cab-0011","name":"Cable 03","cat":"Cables","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1GgmnwPP2zxRQiN6c5KKzB-Dkpl7WkvmE&sz=w800","ref":"TP-CAB-0011","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-BAT-0012":{"id":"tp-bat-0012","name":"Batería 01","cat":"Baterías","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1heADmtFS8C_0DYb_7qzWtXIu4Y2LfUcN&sz=w800","ref":"TP-BAT-0012","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-BAT-0013":{"id":"tp-bat-0013","name":"Batería 02","cat":"Baterías","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1HSepO2sPY30ceISYJHbifLPDmkFt2Iuy&sz=w800","ref":"TP-BAT-0013","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0014":{"id":"tp-fun-0014","name":"Funda tipo 1","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[{"n":"Color 1","k":"","url":"https://drive.google.com/thumbnail?id=109daeQyzPws5NHxo6Ro1ib12nNE9P79J&sz=w800","off":false},{"n":"Color 2","k":"","url":"https://drive.google.com/thumbnail?id=1UokHWVudRQyKzTKZiLsOIzJeLzRuMvxY&sz=w800","off":false}],"refs":[],"img":"https://drive.google.com/thumbnail?id=109daeQyzPws5NHxo6Ro1ib12nNE9P79J&sz=w800","ref":"TP-FUN-0014","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0015":{"id":"tp-fun-0015","name":"Funda tipo 2","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1192BSjR8JbBF2HTLmLGQZEJ-r_Q8PLq4&sz=w800","ref":"TP-FUN-0015","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0016":{"id":"tp-fun-0016","name":"Funda tipo 3","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1J4tJkCtD56Q50BBKqIufKgiBRvZemOe-&sz=w800","ref":"TP-FUN-0016","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0017":{"id":"tp-fun-0017","name":"Funda tipo 4","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1j05BOArlhO_bMNhOYY3YP15L65U2Vl0j&sz=w800","ref":"TP-FUN-0017","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0018":{"id":"tp-fun-0018","name":"Funda tipo 5","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[{"n":"Color 1","k":"","url":"https://drive.google.com/thumbnail?id=1aAuEBjxkeld8MNAS1loaLRNS63vnAhTG&sz=w800","off":false},{"n":"Color 2","k":"","url":"https://drive.google.com/thumbnail?id=1N_RcvhQKJ0HYaNP9Xmm0Wq0IJvw2RmfN&sz=w800","off":false},{"n":"Color 3","k":"","url":"https://drive.google.com/thumbnail?id=1bKcKIbQGQcgK7X0luZT6T2MMKXr5kZcx&sz=w800","off":false}],"refs":[],"img":"https://drive.google.com/thumbnail?id=1aAuEBjxkeld8MNAS1loaLRNS63vnAhTG&sz=w800","ref":"TP-FUN-0018","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0019":{"id":"tp-fun-0019","name":"Funda tipo 6","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=15k7YnpYTYvpjCtOFOjCkWRC6O8M4AX4E&sz=w800","ref":"TP-FUN-0019","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0020":{"id":"tp-fun-0020","name":"Funda tipo 7","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=12AvaGxzG4auFk-AIu17E3FLTAs5ocRmv&sz=w800","ref":"TP-FUN-0020","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0021":{"id":"tp-fun-0021","name":"Funda tipo 8","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1yjmMrRg4h_512_DP7B_CisRWBQiU8wpb&sz=w800","ref":"TP-FUN-0021","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0022":{"id":"tp-fun-0022","name":"Funda tipo 9","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1_Ny8ntTwBBNy8RAm8Hl-PPa7Jsg3fKZs&sz=w800","ref":"TP-FUN-0022","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0023":{"id":"tp-fun-0023","name":"Funda tipo 10","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"funda","sub":"","modelos":[],"colores":[],"refs":[],"img":"https://drive.google.com/thumbnail?id=1cZPcgDet8-kc0EwPlV-45cRLkh_oI-dh&sz=w800","ref":"TP-FUN-0023","brand":"","hasImg":false,"desc":"","sinInv":false},"TP-FUN-0024":{"id":"tp-fun-0024","name":"Funda para cabezal de cargador","cat":"Fundas","price":0,"stock":1,"hidden":false,"agotado":false,"tipo":"normal","sub":"","modelos":[],"colores":[{"n":"Color 1","k":"","url":"https://drive.google.com/thumbnail?id=1p3HAkM561dqtaNV-72d9bm-6G0I-ZaGZ&sz=w800","off":false},{"n":"Color 2","k":"","url":"https://drive.google.com/thumbnail?id=1imiEH7V6ELb2Wd1YXQ1co0hCrWrhr0gE&sz=w800","off":false}],"refs":[],"img":"https://drive.google.com/thumbnail?id=1p3HAkM561dqtaNV-72d9bm-6G0I-ZaGZ&sz=w800","ref":"TP-FUN-0024","brand":"","hasImg":false,"desc":"","sinInv":false}},"site":{"biz":"Tecno Phone","sub":"Tecnología y accesorios","tel":"3167019091","wa":"3167019091","dir":"Centro Comercial Los Panches, local 202, segundo piso","ciudad":"Ibagué, Tolima","email":"","cats":["Audífonos","Apple Pencil","Cables","Baterías","Fundas"]}};
+function whyFailed(e) {
+  if (!e) return '';
+  if (e.noRow) return e.message;
+  if (e.status === 404) return 'La tabla ep_store no existe en el proyecto de Supabase al que apunta index.html (' + CFG.url + '). Ejecuta el SQL en ESE proyecto o cambia la URL y la clave en CFG.';
+  if (e.status === 401 || e.status === 403) return 'Supabase rechazó la clave o faltan las políticas de lectura pública. Revisa la clave anon en CFG y ejecuta el SQL.';
+  if (e.status) return 'Supabase respondió con error ' + e.status + ': ' + (e.body || '');
+  return 'No se pudo contactar a Supabase (' + CFG.url + '): URL incorrecta, proyecto pausado o sin internet. Detalle: ' + (e.message || e);
+}
 async function load(silent) {
   if (!silent) { ST.error = null; renderGrid(); }
+  let cat = null, lg = null, err = null;
   try {
     const rows = await rest('?select=path,data&path=' + inList(['public/catalog']));
-    const cat = rows.find(r => r.path === 'public/catalog');
-    ST.items = normalize(cat && cat.data);
-    ST.site = brandSite((cat && cat.data && cat.data.site) || {});
-    ST.at = (cat && cat.data && cat.data.at) || '';
+    cat = rows.find(r => r.path === 'public/catalog') || null;
+    if (!cat) { err = new Error('Supabase responde, pero todavía no existe la fila public/catalog. Ejecuta el SQL completo o entra una vez al admin.'); err.noRow = true; }
+  } catch (e) { err = e; }
+  if (!cat && ST.loaded && !ST.fallback) { console.warn('Catálogo:', err); return; }   /* fallo pasajero: se conservan los datos reales ya cargados */
+  try {
+    const data = cat ? cat.data : FALLBACK;
+    ST.items = normalize(data);
+    ST.site = brandSite((data && data.site) || {});
+    ST.at = cat ? ((data && data.at) || '') : '';
+    ST.fallback = !cat; ST.diag = err ? whyFailed(err) : '';
+    if (err) console.warn('Catálogo (se muestra el respaldo):', ST.diag);
     ST.loaded = true; ST.error = null; ST.fetchedAt = Date.now(); ST.published = !!cat;
     if (ST.cat !== 'all' && !ST.items.some(i => i.cat === ST.cat)) ST.cat = 'all';
-    applySite(); renderChips(); renderGrid(); renderContact(); renderFoot();
+    applySite(); renderChips(); renderGrid(); renderContact(); renderFoot(); renderDiag();
     routeFromHash();
   } catch (e) {
-    console.warn('Catálogo:', e);
+    console.error('Catálogo (error de pantalla):', e);
     if (!ST.loaded) { ST.error = e; renderGrid(); }
   }
+}
+function renderDiag() {
+  let d = $('#diag');
+  if (!/[?&]diag\b/.test(location.search)) return;
+  if (!d) { d = document.createElement('div'); d.id = 'diag'; d.className = 'diag'; $('#main').prepend(d); }
+  d.innerHTML = ST.diag ? `<b>Diagnóstico (solo lo ves tú con ?diag)</b><br>${esc(ST.diag)}<br><span>Mostrando el catálogo de respaldo, no el de Supabase.</span>` : `<b>Diagnóstico</b><br>Conectado a Supabase: catálogo real cargado (${ST.items.length} productos).`;
 }
 
 /* fotos subidas desde el admin: se piden por lotes solo cuando la tarjeta entra en pantalla */
