@@ -300,6 +300,11 @@ a.icon-btn{text-decoration:none}
 }
 .diag{margin:12px 0;padding:14px 16px;border-radius:18px;font-size:13px;line-height:1.5;color:#5b3a00;background:rgba(255,236,200,.85);border:1px solid rgba(208,138,30,.35)}
 .diag span{color:#8a6a2a}
+/* fotos sin fondo: producto flotando sobre un fondo suave con sombra */
+.frame.cut{background:radial-gradient(75% 70% at 50% 38%,#fff 0%,#E9F0F3 100%)}
+.frame.cut img{object-fit:contain;padding:8%;filter:drop-shadow(0 14px 12px rgba(12,48,58,.24))}
+.pd-media.cut .pd-slide{background:radial-gradient(75% 70% at 50% 38%,#fff 0%,#E9F0F3 100%)}
+.pd-media.cut .pd-slide img{object-fit:contain;background:transparent;padding:6%;filter:drop-shadow(0 20px 16px rgba(12,48,58,.22))}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .top{background:rgba(255,255,255,.94)} .dock{background:rgba(18,26,31,.94)} .sheet{background:#F7FAFB}
 }
@@ -442,7 +447,7 @@ function normalize(raw) {
     key, id: p.id || key, name: String(p.name || '').trim(), cat: p.cat || 'Otros', price: Number(p.price) || 0,
     stock: Number(p.stock) || 0, agotado: !!p.agotado, sinInv: !!p.sinInv, hidden: !!p.hidden,
     img: p.img || '', hasImg: !!p.hasImg, ref: p.ref || key, brand: p.brand || '', desc: String(p.desc || '').trim(),
-    tipo: p.tipo || 'normal', sub: p.sub || '',
+    tipo: p.tipo || 'normal', sub: p.sub || '', nobg: !!p.nobg,
     colores: (p.colores || []).filter(c => c && c.n),
     refs: (p.refs || []).filter(r => r && r.n)
   })).filter(it => !it.hidden && it.name);
@@ -579,7 +584,7 @@ function filtered() {
 function cardHTML(it) {
   const price = it.price ? `<div class="price">${money(it.price)}</div>` : `<div class="price ask">Precio a consultar</div>`;
   return `<button class="card ${it.s}" type="button" data-key="${esc(it.key)}" aria-label="${esc(it.name)}, ${it.price ? money(it.price) : 'precio a consultar'}, ${ST_TXT[it.s]}">
-    <div class="frame">${frameHTML(it)}</div>
+    <div class="frame${it.nobg ? ' cut' : ''}">${frameHTML(it)}</div>
     <div class="name">${esc(it.name)}</div>${price}
     <div class="st ${it.s}"><i></i>${ST_TXT[it.s]}</div></button>`;
 }
@@ -683,7 +688,7 @@ function buildGallery() {
   const media = $('#pdMedia'); if (!media) return;
   const imgs = pdImages(PD.it), sig = imgs.map(i => i.src).join('|');
   if (media.dataset.sig === sig) return;
-  media.dataset.sig = sig; PD.imgs = imgs; PD.cur = Math.min(PD.cur, Math.max(0, imgs.length - 1));
+  media.dataset.sig = sig; media.classList.toggle('cut', !!PD.it.nobg); PD.imgs = imgs; PD.cur = Math.min(PD.cur, Math.max(0, imgs.length - 1));
   if (!imgs.length) { media.innerHTML = pendingPD() ? '' : `<div class="noimg">${IC.pkg}<span>Producto sin foto</span></div>`; $('#pdThumbs').innerHTML = ''; return; }
   const many = imgs.length > 1, fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
   media.innerHTML = `<div class="pd-track" id="pdTrack">${imgs.map((im, i) => `<div class="pd-slide"><img src="${esc(bigUrl(im.src))}" data-alt="${esc(im.src)}" onerror="imgFail(this)" alt="${esc(PD.it.name + (im.n ? ' · ' + im.n : ''))}" draggable="false" decoding="async"></div>`).join('')}</div>

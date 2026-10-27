@@ -5224,7 +5224,7 @@ function v8Sync() {
     S.products.forEach(p => {
       out[(p.code || p.id).toUpperCase()] = { id: p.id, name: p.name, cat: p.category, price: p.price || 0, stock: p.agotado ? 0 : (Number(p.stock) || 0),
         hidden: !!p.webHidden, agotado: !!p.agotado, tipo: p.tipo || 'normal', sub: p.sub || '', modelos: p.modelos || [], colores: (p.colores || []).map(c => ({ n: c.n, k: c.k, url: c.url || '', off: !!c.off })), refs: (p.modelos || []).map(n => ({ m: v8BrandOf(n), n, off: (p.modelosOff || []).includes(n) })), img: p.imgUrl || '',
-        ref: p.code || '', brand: p.brand || '', hasImg: !!(p.img && !p.imgUrl), desc: String(p.webDesc || '').slice(0, 600), sinInv: !!p.sinInv };
+        ref: p.code || '', brand: p.brand || '', hasImg: !!(p.img && !p.imgUrl), desc: String(p.webDesc || '').slice(0, 600), sinInv: !!p.sinInv, nobg: !!p.nobg };
     });
     localStorage.setItem('ep_web_inv', JSON.stringify({ at: nowISO(), items: out }));
   } catch (e) { }
@@ -5511,6 +5511,8 @@ function verProducto(id) {
         <button class="btn" onclick="closeModal();recargarStock('${p.id}')">📥 Entrada de stock</button>
         <button class="btn" onclick="closeModal();v8ToggleWeb('${p.id}')">${p.webHidden ? '🌐 Mostrar en la web' : '🙈 Ocultar en la web'}</button>
         <button class="btn" onclick="closeModal();ytWebDesc('${p.id}')">📝 Texto del catálogo</button>
+        <button class="btn" onclick="closeModal();ytBgOne('${p.id}')">✨ Quitar fondo</button>
+        <button class="btn" onclick="closeModal();ytBgUpload('${p.id}')">📷 Subir foto</button>${p.nobg ? `<button class="btn" onclick="closeModal();ytBgUndo('${p.id}')">↩️ Foto original</button>` : ''}
         <button class="btn" onclick="closeModal();v8ToggleAgotado('${p.id}')">${p.agotado ? '♻️ Quitar agotado' : '⛔ Marcar como agotado'}</button>
         <button class="btn danger" onclick="closeModal();v8Borrar('${p.id}')">🗑️ Eliminar producto</button></div>` });
 }
@@ -5947,6 +5949,146 @@ function ytBrandMigrate() {
   const _ss = supaStart; supaStart = async function () { const r = await _ss.apply(this, arguments); ytBrandMigrate(); return r; };
   const go = () => setTimeout(ytBrandMigrate, 300);
   if (window.__efListo) go(); else window.addEventListener('ef:listo', go, { once: true });
+})();
+
+/* ================= ADMIN V13 · Quitar el fondo a las fotos de los productos ================= */
+/* IA en el navegador (IMG.LY, ~40-80 MB la primera vez, queda en caché). Si no carga, usa un recorte básico por color de fondo. */
+var BG_LIB = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.0/dist/index.mjs';
+var ytBgState = { lib: null, aiFailed: false, cancel: false, running: false };
+const ytSleep = ms => new Promise(r => setTimeout(r, ms));
+function ytSrcCandidates(url) {
+  const m = /[?&]id=([\w-]+)/.exec(url) || /\/d\/([\w-]+)/.exec(url);
+  return m ? ['https://lh3.googleusercontent.com/d/' + m[1] + '=w1200', 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1200'] : [url];
+}
+async function ytFetchBlob(url) {
+  if (/^data:|^blob:/.test(url)) return (await fetch(url)).blob();
+  let last;
+  for (const u of ytSrcCandidates(url)) { try { const r = await fetch(u, { mode: 'cors' }); if (r.ok) return await r.blob(); last = new Error('HTTP ' + r.status); } catch (e) { last = e; } }
+  const e = new Error('No se pudo leer la foto de Drive. Revisa que la carpeta esté compartida con "cualquiera con el enlace", o usa "Subir foto".'); e.read = true; e.cause = last; throw e;
+}
+async function ytToBlob(out) {
+  if (out instanceof Blob) return out;
+  if (out && typeof out.convertToBlob === 'function') return out.convertToBlob('image/png');
+  if (typeof ImageData !== 'undefined' && out instanceof ImageData) { const c = document.createElement('canvas'); c.width = out.width; c.height = out.height; c.getContext('2d').putImageData(out, 0, 0); return new Promise(r => c.toBlob(r, 'image/png')); }
+  throw new Error('Resultado inesperado de la IA');
+}
+/* recorte básico: borra el color de fondo que toca los bordes de la foto */
+async function ytCutBasic(blob) {
+  const bmp = await createImageBitmap(blob), sc = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * sc), h = Math.round(bmp.height * sc);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, w, h);
+  const im = x.getImageData(0, 0, w, h), d = im.data, px = (X, Y) => (Y * w + X) * 4;
+  const R = [], G = [], B = [];
+  const push = (X, Y) => { const i = px(X, Y); R.push(d[i]); G.push(d[i + 1]); B.push(d[i + 2]); };
+  for (let X = 0; X < w; X++) { push(X, 0); push(X, h - 1); } for (let Y = 0; Y < h; Y++) { push(0, Y); push(w - 1, Y); }
+  const med = a => a.sort((p, q) => p - q)[a.length >> 1], br = med(R), bg = med(G), bb = med(B), tol = 52;
+  const near = i => Math.abs(d[i] - br) + Math.abs(d[i + 1] - bg) + Math.abs(d[i + 2] - bb) < tol * 1.6;
+  const seen = new Uint8Array(w * h), st = [];
+  const seed = (X, Y) => { const k = Y * w + X; if (!seen[k] && near(k * 4)) { seen[k] = 1; st.push(k); } };
+  for (let X = 0; X < w; X++) { seed(X, 0); seed(X, h - 1); } for (let Y = 0; Y < h; Y++) { seed(0, Y); seed(w - 1, Y); }
+  while (st.length) { const k = st.pop(), X = k % w, Y = (k / w) | 0; if (X > 0) seed(X - 1, Y); if (X < w - 1) seed(X + 1, Y); if (Y > 0) seed(X, Y - 1); if (Y < h - 1) seed(X, Y + 1); }
+  for (let k = 0; k < w * h; k++) { if (seen[k]) d[k * 4 + 3] = 0; }
+  for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const k = Y * w + X; if (!seen[k] && (seen[k - 1] || seen[k + 1] || seen[k - w] || seen[k + w])) d[k * 4 + 3] = 150; }
+  x.putImageData(im, 0, 0);
+  return new Promise(r => c.toBlob(r, 'image/png'));
+}
+async function ytRemoveBg(blob, prog) {
+  if (!ytBgState.aiFailed) {
+    try {
+      if (!ytBgState.lib) ytBgState.lib = import(BG_LIB).then(m => m.removeBackground || m.default);
+      const rb = await ytBgState.lib;
+      return await ytToBlob(await rb(blob, { progress: prog }));
+    } catch (e) { console.warn('IA de fondo no disponible, se usa el recorte básico:', e); ytBgState.aiFailed = true; ytBgState.lib = null; }
+  }
+  return ytCutBasic(blob);
+}
+/* recorta los márgenes, centra en cuadrado y guarda liviano (WebP con transparencia) */
+async function ytFinish(png) {
+  const bmp = await createImageBitmap(png), sc = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * sc), h = Math.round(bmp.height * sc);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data; let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) if (d[(Y * w + X) * 4 + 3] > 24) { if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; }
+  if (x1 < x0 || y1 < y0) throw new Error('No se detectó el producto en la foto');
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, side = Math.round(Math.max(bw, bh) * 1.1);
+  const o = document.createElement('canvas'); o.width = o.height = side;
+  o.getContext('2d').drawImage(c, x0, y0, bw, bh, Math.round((side - bw) / 2), Math.round((side - bh) / 2), bw, bh);
+  return o.toDataURL('image/webp', 0.9);
+}
+async function ytCutBlob(blob, prog) { return ytFinish(await ytRemoveBg(blob, prog)); }
+const ytColSrc = c => c.url || c.urlOrig || (c.k && IMG[c.k]) || '';
+async function ytCutProduct(p, prog) {
+  const cols = p.colores || [], main = p.imgUrl || p.imgOrig || (IMG[p.id] || '');
+  if (cols.length) {
+    const outs = [];
+    for (let i = 0; i < cols.length; i++) { const s = ytColSrc(cols[i]); if (!s) { outs.push(null); continue; } outs.push(await ytCutBlob(await ytFetchBlob(s), prog)); }
+    const first = outs.find(Boolean); if (!first) throw new Error('Sin fotos para procesar');
+    for (let i = 0; i < cols.length; i++) { if (!outs[i]) continue; const k = p.id + '_c' + i; await imgSet(k, outs[i]); cols[i].urlOrig = cols[i].urlOrig || cols[i].url || ''; cols[i].url = ''; cols[i].k = k; }
+    await imgSet(p.id, first);
+  } else {
+    if (!main) throw new Error('El producto no tiene foto');
+    await imgSet(p.id, await ytCutBlob(await ytFetchBlob(main), prog));
+  }
+  p.imgOrig = p.imgOrig || p.imgUrl || ''; p.imgUrl = ''; p.img = true; p.nobg = true; p.updatedAt = nowISO();
+}
+async function ytBgUndoProduct(p) {
+  (p.colores || []).forEach(c => { if (c.urlOrig) { c.url = c.urlOrig; delete c.urlOrig; } if (c.k && /_c\d+$/.test(c.k)) { imgDel(c.k); delete c.k; } });
+  if (p.imgOrig) { p.imgUrl = p.imgOrig; await imgDel(p.id); p.img = false; }
+  p.nobg = false; p.updatedAt = nowISO();
+}
+/* ---- pantalla de proceso masivo ---- */
+function ytBgPending() { return S.products.filter(p => !p.nobg && (p.imgUrl || p.imgOrig || IMG[p.id] || (p.colores || []).length)); }
+function ytBgAll() {
+  const n = ytBgPending().length;
+  modal({ title: 'Quitar el fondo a las fotos', em: '✨', footer: `<button class="btn" onclick="ytBgStop()">Cerrar</button><button class="btn primary" id="bgGo" onclick="ytBgRun()" ${n ? '' : 'disabled'}>Empezar (${n} productos)</button>`,
+    body: `<div class="alertbox b"><span class="em">ℹ️</span><div>La IA recorta cada producto y lo deja sin fondo, centrado. Se hace en <b>este computador</b>; la primera vez descarga el modelo (40-80 MB) y tarda unos minutos. <b>No cierres esta pestaña</b> mientras trabaja.</div></div>
+      <div id="bgTxt" class="tiny" style="margin:14px 0 8px;min-height:1.3em">${n ? 'Todo listo para empezar.' : 'Todos los productos ya tienen el fondo quitado.'}</div>
+      <div style="height:10px;border-radius:99px;background:var(--line,#e6ecf0);overflow:hidden"><div id="bgBar" style="height:100%;width:0;background:var(--grad,#0E93A5);transition:width .3s"></div></div><div id="bgFails" class="tiny" style="margin-top:12px;color:var(--bad,#D62F2F)"></div>` });
+}
+function ytBgStop() { ytBgState.cancel = true; closeModal(); }
+async function ytBgRun() {
+  if (ytBgState.running) return; ytBgState.running = true; ytBgState.cancel = false;
+  const list = ytBgPending(), set = (t) => { const e = document.getElementById('bgTxt'); if (e) e.textContent = t; }, bar = p => { const e = document.getElementById('bgBar'); if (e) e.style.width = p + '%'; };
+  const go = document.getElementById('bgGo'); if (go) go.disabled = true;
+  let ok = 0, readFails = 0; const fails = [];
+  const prog = (key, cur, tot) => { if (/fetch|model|onnx|wasm|download/i.test(String(key))) set('Descargando el modelo de IA (solo la primera vez)… ' + (tot ? Math.round(cur / tot * 100) + '%' : '')); };
+  for (let i = 0; i < list.length && !ytBgState.cancel; i++) {
+    const p = list[i]; set(`Procesando ${i + 1} de ${list.length}: ${p.name}${ytBgState.aiFailed ? ' (modo básico)' : ''}`); bar(Math.round(i / list.length * 100));
+    try { await ytCutProduct(p, prog); ok++; readFails = 0; save('products'); }
+    catch (e) { fails.push(p.name + ': ' + (e.message || e)); if (e.read) readFails++; else readFails = 0; if (readFails >= 3) { fails.push('Se detuvo: Drive no deja leer las fotos desde aquí.'); break; } }
+    await ytSleep(30);
+  }
+  bar(100); try { v8Sync(); render(); } catch (e) { }
+  const f = document.getElementById('bgFails'); if (f) f.innerHTML = fails.map(x => '• ' + esc(x)).join('<br>');
+  set(ytBgState.cancel ? `Cancelado. ${ok} listos.` : `Listo: ${ok} de ${list.length} productos sin fondo${ytBgState.aiFailed ? ' (con recorte básico: revisa los resultados)' : ''}.`);
+  toast(ok + ' fotos sin fondo', '✨'); ytBgState.running = false;
+  const g2 = document.getElementById('bgGo'); if (g2) { g2.disabled = false; g2.textContent = 'Reintentar los pendientes'; }
+}
+/* ---- un solo producto ---- */
+async function ytBgOne(id) {
+  const p = S.products.find(x => x.id === id); if (!p) return;
+  toast('Quitando fondo… puede tardar la primera vez', '✨');
+  try { await ytCutProduct(p); save('products'); v8Sync(); render(); toast('Fondo quitado: ' + p.name, '✨'); }
+  catch (e) { toast(e.message || 'No se pudo quitar el fondo', '🚫'); }
+}
+function ytBgUpload(id) {
+  const p = S.products.find(x => x.id === id); if (!p) return;
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return; toast('Quitando fondo a la foto…', '✨');
+    try { await imgSet(p.id, await ytCutBlob(f)); p.imgOrig = p.imgOrig || p.imgUrl || ''; p.imgUrl = ''; p.img = true; p.nobg = true; p.updatedAt = nowISO(); save('products'); v8Sync(); render(); toast('Foto sin fondo guardada', '✨'); }
+    catch (e) { toast(e.message || 'No se pudo procesar la foto', '🚫'); }
+  };
+  inp.click();
+}
+async function ytBgUndo(id) { const p = S.products.find(x => x.id === id); if (!p) return; await ytBgUndoProduct(p); save('products'); v8Sync(); render(); toast('Foto original restaurada', '↩️'); }
+(function () {
+  const _inv = VIEWS.inventario;
+  VIEWS.inventario = function () {
+    const n = ytBgPending().length;
+    const banner = n ? `<div class="alertbox y" style="margin-bottom:14px;align-items:center"><span class="em">🖼️</span><div style="flex:1"><b>${n} productos con el fondo de la foto.</b> Quítalo con un clic para que el catálogo se vea profesional.</div><button class="btn primary sm" onclick="ytBgAll()">✨ Quitar fondo</button></div>` : '';
+    return banner + _inv.apply(this, arguments);
+  };
 })();
 
 </script>
