@@ -4794,13 +4794,13 @@ VIEWS.web=function(){
 
   <div class="card"><div class="card-h"><h3><span class="em">✉️</span>Envío de correos (EmailJS)</h3></div>
     <div class="card-b">
-      <div class="alertbox y"><span class="em">⚠️</span><div>Para que los registros y el código de acceso lleguen a <b>tu correo</b> hay que crear una cuenta gratis en <b>emailjs.com</b> y pegar aquí las tres claves. Sin esto, los registros igual quedan guardados arriba y se envían por WhatsApp.</div></div>
+      <div class="alertbox y"><span class="em">⚠️</span><div>Para que los registros y el código de acceso lleguen a <b>tecnophoneapplestore@gmail.com</b> hay que crear una cuenta gratis en <b>emailjs.com</b> y pegar aquí las tres claves. Sin esto, los registros igual quedan guardados arriba y se envían por WhatsApp.</div></div>
       <div class="row c3" style="margin-top:12px">
         <label class="field"><span>Service ID</span><input type="text" value="${esc((c.mail||{}).service||'')}" onchange="webMail('service',this.value)"></label>
         <label class="field"><span>Template ID</span><input type="text" value="${esc((c.mail||{}).template||'')}" onchange="webMail('template',this.value)"></label>
         <label class="field"><span>Public Key</span><input type="text" value="${esc((c.mail||{}).key||'')}" onchange="webMail('key',this.value)"></label>
       </div>
-      <label class="field"><span>Correo que recibe</span><input type="text" value="${esc((c.mail||{}).to||'')}" onchange="webMail('to',this.value)"></label>
+      <label class="field"><span>Correo que recibe</span><input type="text" value="${esc((c.mail||{}).to||'tecnophoneapplestore@gmail.com')}" onchange="webMail('to',this.value)"></label>
       <label class="sortrow" style="margin-top:4px"><div class="sw"><input type="checkbox" ${c.twofa?'checked':''} onchange="webSet('twofa',this.checked)"><i></i></div>
         <div style="flex:1"><b class="tiny">Pedir código por correo al entrar al portal</b><div class="tiny muted">Requiere EmailJS configurado arriba.</div></div></label>
     </div></div>
@@ -4828,9 +4828,9 @@ if(_loginAs){
     if(!c.twofa||!(m.service&&m.template&&m.key&&window.emailjs))return _loginAs(id);
     const u=S.config.users.find(x=>x.id===id);if(!u)return _loginAs(id);
     const code=String(Math.floor(1000+Math.random()*9000));
-    try{emailjs.send(m.service,m.template,{to_email:m.to||'',nombre:u.nombre,codigo:code,asunto:'Código de acceso al portal'},m.key)}catch(e){}
+    try{emailjs.send(m.service,m.template,{to_email:m.to||'tecnophoneapplestore@gmail.com',nombre:u.nombre,codigo:code,asunto:'Código de acceso al portal'},m.key)}catch(e){}
     modal({title:'Verificación en dos pasos',em:'🔐',ok:'Verificar',
-      body:`<div class="alertbox b"><span class="em">✉️</span><div>Enviamos un código de 4 dígitos a <b>${esc(m.to||'')}</b>.</div></div>
+      body:`<div class="alertbox b"><span class="em">✉️</span><div>Enviamos un código de 4 dígitos a <b>${esc(m.to||'tecnophoneapplestore@gmail.com')}</b>.</div></div>
         <label class="field" style="margin-top:14px"><span>Código de 4 dígitos</span><input type="text" name="code" inputmode="numeric" maxlength="4" style="font-size:24px;text-align:center;letter-spacing:.5em" onkeydown="if(event.key==='Enter')submitModal()"></label>`,
       onSubmit:f=>{if(String(f.code).trim()!==code)return toast('Código incorrecto','🚫');closeModal();_loginAs(id)}});
   };
@@ -4852,7 +4852,7 @@ function webUpMix(inp,key,max){
 }
 
 /* ================= ADMIN V6 · 2FA, categorías con banner ================= */
-const MAIL_TO_EP='';
+const MAIL_TO_EP='tecnophoneapplestore@gmail.com';
 function epSendMail(asunto,datos){
   const c=siteGet(),m=c.mail||{},to=m.to||MAIL_TO_EP;
   if(m.service&&m.template&&m.key&&window.emailjs){
@@ -5663,7 +5663,7 @@ function v10Entrar() {
   v10User = us;
   // Enviar código de verificación al correo
   v10Code = String(Math.floor(100000 + Math.random() * 900000)); v10Exp = Date.now() + 10 * 60 * 1000; v10Tries = 0;
-  const to = (siteGet().mail || {}).to || '';
+  const to = (siteGet().mail || {}).to || 'tecnophoneapplestore@gmail.com';
   try { epSendMail('🔐 Código de acceso · ' + (S.config.biz || 'Tecno Phone'), { Usuario: us.nombre, Codigo: v10Code, Vence: 'en 10 minutos', Fecha: new Date().toLocaleString('es-CO') }); } catch (e) { }
   v10Shell(`<div class="alertbox b"><span class="em">✉️</span><div>Enviamos un código de <b>6 dígitos</b> a <b>${esc(to)}</b>. Vence en 10 minutos.</div></div>
     <label class="field" style="margin-top:12px"><span>Código de verificación</span><input type="text" id="v10C" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="font-size:1.4rem;letter-spacing:.35em;text-align:center" onkeydown="if(event.key==='Enter')v10Verificar()"></label>
@@ -5672,7 +5672,7 @@ function v10Entrar() {
 }
 function v10Enviar() {
   v10Code = String(Math.floor(100000 + Math.random() * 900000)); v10Exp = Date.now() + 10 * 60 * 1000; v10Tries = 0;
-  const to = (siteGet().mail || {}).to || '';
+  const to = (siteGet().mail || {}).to || 'tecnophoneapplestore@gmail.com';
   let envio = null;
   try { envio = epSendMail('🔐 Código de acceso · ' + (S.config.biz || 'Tecno Phone'), { Usuario: v10User.nombre, Codigo: v10Code, Vence: 'en 10 minutos', Fecha: new Date().toLocaleString('es-CO') }); } catch (e) { }
   v10Shell(`<div class="alertbox b"><span class="em">✉️</span><div>Enviamos un código de <b>6 dígitos</b> a <b>${esc(to)}</b>. Vence en 10 minutos.</div></div>
@@ -5707,7 +5707,7 @@ setTimeout(function(){if(!SESSION)window.loginScreen()},600);
    'supabase' → Supabase Auth genera, envía y valida el código del correo (lado servidor). Recomendado.
    'legacy'   → flujo V10 anterior: el código se genera y se compara en el navegador. Solo para emergencias. */
 var ADMIN_LOGIN_MODE = 'supabase';
-var ADMIN_EMAIL_DEF = '';   /* opcional: correo fijo. Debe existir en Supabase → Authentication → Users */
+var ADMIN_EMAIL_DEF = 'tecnophoneapplestore@gmail.com';   /* opcional: correo fijo. Debe existir en Supabase → Authentication → Users */
 var ADMIN_REVERIFY_H = 168;                        /* horas (7 días) antes de pedir de nuevo correo y contraseña */
 
 /* ---- Catálogo público: solo datos aptos para clientes (sin usuarios, PIN, costos ni configuración interna) ---- */
