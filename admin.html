@@ -5954,7 +5954,8 @@ function ytBrandMigrate() {
 /* ================= ADMIN V13 · Quitar el fondo a las fotos de los productos ================= */
 /* IA en el navegador (IMG.LY, ~40-80 MB la primera vez, queda en caché). Si no carga, usa un recorte básico por color de fondo. */
 var BG_LIB = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.0/dist/index.mjs';
-var ytBgState = { lib: null, aiFailed: false, cancel: false, running: false };
+var BG_BASE = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.0/dist/';
+var ytBgState = { lib: null, rmbg: null, cfg: undefined, aiFailed: false, cancel: false, running: false, dead: {}, engine: '', autoDone: false };
 const ytSleep = ms => new Promise(r => setTimeout(r, ms));
 function ytSrcCandidates(url) {
   const m = /[?&]id=([\w-]+)/.exec(url) || /\/d\/([\w-]+)/.exec(url);
@@ -5981,7 +5982,9 @@ async function ytCutBasic(blob) {
   const R = [], G = [], B = [];
   const push = (X, Y) => { const i = px(X, Y); R.push(d[i]); G.push(d[i + 1]); B.push(d[i + 2]); };
   for (let X = 0; X < w; X++) { push(X, 0); push(X, h - 1); } for (let Y = 0; Y < h; Y++) { push(0, Y); push(w - 1, Y); }
-  const med = a => a.sort((p, q) => p - q)[a.length >> 1], br = med(R), bg = med(G), bb = med(B), tol = 52;
+  const sd = a => { const m = a.reduce((s, t) => s + t, 0) / a.length; return Math.sqrt(a.reduce((s, t) => s + (t - m) * (t - m), 0) / a.length); };
+  if (Math.max(sd(R), sd(G), sd(B)) > 26) { const why = Object.entries(ytBgState.dead).map(([k, m]) => k + ': ' + m).join(' | '); const e = new Error('El fondo de la foto no es liso y la IA no pudo cargar (' + (why || 'sin detalle') + ').'); e.ai = true; throw e; }
+  const med = a => a.slice().sort((p, q) => p - q)[a.length >> 1], br = med(R), bg = med(G), bb = med(B), tol = 52;
   const near = i => Math.abs(d[i] - br) + Math.abs(d[i + 1] - bg) + Math.abs(d[i + 2] - bb) < tol * 1.6;
   const seen = new Uint8Array(w * h), st = [];
   const seed = (X, Y) => { const k = Y * w + X; if (!seen[k] && near(k * 4)) { seen[k] = 1; st.push(k); } };
@@ -5992,14 +5995,47 @@ async function ytCutBasic(blob) {
   x.putImageData(im, 0, 0);
   return new Promise(r => c.toBlob(r, 'image/png'));
 }
+async function ytRmbg(blob, prog) {          /* IA 1: RMBG-1.4 con Transformers.js */
+  if (!ytBgState.rmbg) ytBgState.rmbg = (async () => {
+    const T = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2');
+    T.env.allowLocalModels = false;
+    const model = await T.AutoModel.from_pretrained('briaai/RMBG-1.4', { config: { model_type: 'custom' }, progress_callback: p => { if (prog && p && p.status === 'progress') prog('model', p.loaded || 0, p.total || 0); } });
+    const processor = await T.AutoProcessor.from_pretrained('briaai/RMBG-1.4', { config: { do_normalize: true, do_pad: false, do_rescale: true, do_resize: true, image_mean: [0.5, 0.5, 0.5], feature_extractor_type: 'ImageFeatureExtractor', image_std: [1, 1, 1], resample: 2, rescale_factor: 0.00392156862745098, size: { width: 1024, height: 1024 } } });
+    return { T, model, processor };
+  })();
+  let eng; try { eng = await ytBgState.rmbg; } catch (e) { ytBgState.rmbg = null; throw e; }
+  const { T, model, processor } = eng, url = URL.createObjectURL(blob);
+  try {
+    const image = await T.RawImage.fromURL(url);
+    const { pixel_values } = await processor(image);
+    const { output } = await model({ input: pixel_values });
+    const mask = await T.RawImage.fromTensor(output[0].mul(255).to('uint8')).resize(image.width, image.height);
+    const bmp = await createImageBitmap(blob), sc = Math.min(1, 1100 / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * sc), h = Math.round(bmp.height * sc);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, w, h);
+    const im = x.getImageData(0, 0, w, h), d = im.data, mk = document.createElement('canvas'); mk.width = image.width; mk.height = image.height;
+    const mx = mk.getContext('2d'), mi = mx.createImageData(image.width, image.height); for (let k = 0; k < mask.data.length; k++) { mi.data[k * 4 + 3] = mask.data[k]; } mx.putImageData(mi, 0, 0);
+    const ms = document.createElement('canvas'); ms.width = w; ms.height = h; const msx = ms.getContext('2d', { willReadFrequently: true }); msx.drawImage(mk, 0, 0, w, h);
+    const md = msx.getImageData(0, 0, w, h).data; for (let k = 0; k < w * h; k++) d[k * 4 + 3] = md[k * 4 + 3];
+    x.putImageData(im, 0, 0);
+    return await new Promise(r => c.toBlob(r, 'image/png'));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function ytImgly(blob, prog) {            /* IA 2: IMG.LY */
+  if (!ytBgState.lib) ytBgState.lib = import(BG_LIB).then(m => m.removeBackground || m.default);
+  let rb; try { rb = await ytBgState.lib; } catch (e) { ytBgState.lib = null; throw e; }
+  const cfgs = ytBgState.cfg !== undefined ? [ytBgState.cfg] : [{ publicPath: BG_BASE }, {}];
+  let last;
+  for (const c of cfgs) { try { const out = await ytToBlob(await rb(blob, Object.assign({ progress: prog }, c))); ytBgState.cfg = c; return out; } catch (e) { last = e; } }
+  throw last;
+}
 async function ytRemoveBg(blob, prog) {
-  if (!ytBgState.aiFailed) {
-    try {
-      if (!ytBgState.lib) ytBgState.lib = import(BG_LIB).then(m => m.removeBackground || m.default);
-      const rb = await ytBgState.lib;
-      return await ytToBlob(await rb(blob, { progress: prog }));
-    } catch (e) { console.warn('IA de fondo no disponible, se usa el recorte básico:', e); ytBgState.aiFailed = true; ytBgState.lib = null; }
+  for (const [name, fn] of [['IA-1', ytRmbg], ['IA-2', ytImgly]]) {
+    if (ytBgState.dead[name]) continue;
+    try { const out = await fn(blob, prog); ytBgState.engine = name; return out; }
+    catch (e) { console.warn(name + ' no disponible:', e); ytBgState.dead[name] = String((e && e.message) || e).slice(0, 140); }
   }
+  ytBgState.aiFailed = true;
   return ytCutBasic(blob);
 }
 /* recorta los márgenes, centra en cuadrado y guarda liviano (WebP con transparencia) */
@@ -6053,14 +6089,15 @@ async function ytBgRun() {
   let ok = 0, readFails = 0; const fails = [];
   const prog = (key, cur, tot) => { if (/fetch|model|onnx|wasm|download/i.test(String(key))) set('Descargando el modelo de IA (solo la primera vez)… ' + (tot ? Math.round(cur / tot * 100) + '%' : '')); };
   for (let i = 0; i < list.length && !ytBgState.cancel; i++) {
-    const p = list[i]; set(`Procesando ${i + 1} de ${list.length}: ${p.name}${ytBgState.aiFailed ? ' (modo básico)' : ''}`); bar(Math.round(i / list.length * 100));
+    const p = list[i]; set(`Procesando ${i + 1} de ${list.length}: ${p.name}${ytBgState.aiFailed ? ' (sin IA)' : ''}`); bar(Math.round(i / list.length * 100));
     try { await ytCutProduct(p, prog); ok++; readFails = 0; save('products'); }
-    catch (e) { fails.push(p.name + ': ' + (e.message || e)); if (e.read) readFails++; else readFails = 0; if (readFails >= 3) { fails.push('Se detuvo: Drive no deja leer las fotos desde aquí.'); break; } }
+    catch (e) { if (e.ai) { fails.push(e.message); break; } fails.push(p.name + ': ' + (e.message || e)); if (e.read) readFails++; else readFails = 0; if (readFails >= 3) { fails.push('Se detuvo: Drive no deja leer las fotos desde aquí.'); break; } }
     await ytSleep(30);
   }
   bar(100); try { v8Sync(); render(); } catch (e) { }
-  const f = document.getElementById('bgFails'); if (f) f.innerHTML = fails.map(x => '• ' + esc(x)).join('<br>');
-  set(ytBgState.cancel ? `Cancelado. ${ok} listos.` : `Listo: ${ok} de ${list.length} productos sin fondo${ytBgState.aiFailed ? ' (con recorte básico: revisa los resultados)' : ''}.`);
+  const dead = Object.entries(ytBgState.dead).map(([k, m]) => k + ' no cargó: ' + m); const f = document.getElementById('bgFails'); if (f) f.innerHTML = fails.concat(dead).map(x => '• ' + esc(x)).join('<br>');
+  try { if (fails.length) localStorage.setItem('yt_bg_fail', String(Date.now())); else localStorage.removeItem('yt_bg_fail'); } catch (e) { }
+  set(ytBgState.cancel ? `Cancelado. ${ok} listos.` : `Listo: ${ok} de ${list.length} productos sin fondo${ytBgState.aiFailed ? ' (sin IA: revisa los resultados)' : ''}.`);
   toast(ok + ' fotos sin fondo', '✨'); ytBgState.running = false;
   const g2 = document.getElementById('bgGo'); if (g2) { g2.disabled = false; g2.textContent = 'Reintentar los pendientes'; }
 }
@@ -6089,6 +6126,21 @@ async function ytBgUndo(id) { const p = S.products.find(x => x.id === id); if (!
     const banner = n ? `<div class="alertbox y" style="margin-bottom:14px;align-items:center"><span class="em">🖼️</span><div style="flex:1"><b>${n} productos con el fondo de la foto.</b> Quítalo con un clic para que el catálogo se vea profesional.</div><button class="btn primary sm" onclick="ytBgAll()">✨ Quitar fondo</button></div>` : '';
     return banner + _inv.apply(this, arguments);
   };
+})();
+
+/* ---- arranque automático: al entrar Gerencia, si hay fotos con fondo, empieza solo ---- */
+function ytBgAuto() {
+  try {
+    if (ytBgState.autoDone || ytBgState.running || !SESSION) return;
+    if (typeof perfil === 'function' && perfil() !== 'gerencia') return;
+    if (!ytBgPending().length) return;
+    const lf = Number(localStorage.getItem('yt_bg_fail') || 0); if (lf && Date.now() - lf < 6 * 36e5) return;
+    ytBgState.autoDone = true; ytBgAll(); setTimeout(ytBgRun, 500);
+  } catch (e) { console.warn('auto fondo', e); }
+}
+(function () {
+  const _en = window.ytV11 && window.ytV11.pick;
+  let was = null; setInterval(function () { const now = !!SESSION; if (now && !was) setTimeout(ytBgAuto, 2500); was = now; }, 800);
 })();
 
 </script>
