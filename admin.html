@@ -5743,94 +5743,42 @@ function ytWebDesc(id) {
     } });
 }
 
-/* ---- Acceso: 1) código al correo validado por Supabase Auth · 2) código de perfil ---- */
+/* ---- Acceso: 1) correo + contraseña (Supabase) · 2) código de 6 dígitos al correo · 3) elegir perfil (solo Gerencia pide PIN) ---- */
 (function () {
   if (ADMIN_LOGIN_MODE !== 'supabase' || !SUPA_ON) return;
-  const HASH0 = location.hash;
   const VK = 'yt_admin_ok';
-  let mail = ADMIN_EMAIL_DEF || (function () { try { return localStorage.getItem('yt_admin_mail') || ''; } catch (e) { return ''; } })(), cool = 0, pinTries = 0, busy = false, linkDone = null;
+  const GER_PIN_EXTRA = 'g3r3nc1a';                    /* PIN alternativo de Gerencia (además del guardado en Usuarios) */
+  let mail = ADMIN_EMAIL_DEF || (function () { try { return localStorage.getItem('yt_admin_mail') || ''; } catch (e) { return ''; } })();
+  let busy = false, cool = 0, codeVal = null, codeExp = 0, codeTries = 0, pinTries = 0, codeSent = false;
   SESSION = null; try { localStorage.removeItem('ef_session'); } catch (e) { }
 
   const H = { apikey: SUPA.key, 'Content-Type': 'application/json' };
   const g = id => document.getElementById(id);
   const msg = (t, ok) => { const m = g('v11Msg'); if (m) { m.textContent = t || ''; m.style.color = ok ? 'var(--muted,#64748b)' : 'var(--bad,#D62F2F)'; } };
+  const codeTo = () => (siteGet().mail || {}).to || MAIL_TO_EP || ADMIN_EMAIL_DEF;
   const verified = () => { try { const v = JSON.parse(localStorage.getItem(VK) || 'null'); return !!(v && SUPA_SES && SUPA_SES.rt && v.email === SUPA_SES.email && Date.now() - v.at < ADMIN_REVERIFY_H * 36e5); } catch (e) { return false; } };
-  const mark = () => { try { localStorage.setItem(VK, JSON.stringify({ email: SUPA_SES.email, at: Date.now() })); } catch (e) { } };
   const errTxt = (j, st) => {
     const m = String((j && (j.msg || j.error_description || j.message || j.error)) || '');
     if (/invalid login|invalid_credentials|invalid grant/i.test(m)) return 'Correo o contraseña incorrectos.';
-    if (/signup|not found|not allowed/i.test(m)) return 'Ese correo no está autorizado. Debe existir en Supabase → Authentication → Users.';
-    if (st === 429 || /rate limit|security purposes|too many/i.test(m)) return 'Se pidieron demasiados códigos. Espera unos minutos y vuelve a intentar.';
-    if (/expired|invalid|otp/i.test(m)) return 'El código no es válido o ya venció. Pide uno nuevo.';
+    if (st === 429 || /rate limit|too many/i.test(m)) return 'Demasiados intentos. Espera unos minutos y vuelve a intentar.';
     return m || ('No se pudo completar (error ' + st + ').');
   };
-  function setSes(j, email) {
+  function setSes(j, email, keep) {                    /* la sesión solo se guarda en el equipo cuando el código del correo ya se verificó */
     SUPA_SES = { at: j.access_token, rt: j.refresh_token, exp: Date.now() + ((Number(j.expires_in) || 3600) - 60) * 1000, email: (j.user && j.user.email) || email };
-    try { localStorage.setItem('ep_supa_session', JSON.stringify(SUPA_SES)); } catch (e) { }
-    mark();
+    if (keep) { try { localStorage.setItem('ep_supa_session', JSON.stringify(SUPA_SES)); localStorage.setItem(VK, JSON.stringify({ email: SUPA_SES.email, at: Date.now() })); } catch (e) { } }
   }
-  async function linkSession() {           /* enlace del correo abierto en este dispositivo */
-    if (!HASH0 || HASH0.length < 2) return null;
-    const h = new URLSearchParams(HASH0.slice(1));
-    if (!h.get('access_token') && !h.get('error_description')) return null;
-    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
-    if (h.get('error_description')) return 'El enlace no es válido o ya venció. Pide un código nuevo.';
-    const at = h.get('access_token');
-    const r = await fetch(SUPA.url + '/auth/v1/user', { headers: { apikey: SUPA.key, Authorization: 'Bearer ' + at } });
-    if (!r.ok) return 'El enlace no es válido o ya venció. Pide un código nuevo.';
-    const u = await r.json().catch(() => ({}));
-    setSes({ access_token: at, refresh_token: h.get('refresh_token'), expires_in: h.get('expires_in'), user: u });
-    return 'ok';
-  }
-  linkDone = linkSession().catch(() => 'No se pudo validar el enlace.');
+  const back = '<a href="/" style="color:var(--blue);font-weight:600">← Volver al catálogo</a>';
 
-  function stepEmail(t, how) {
-    v10Lock = true; SESSION = null; how = how || 'pass';
-    const mailField = `<label class="field" style="margin-top:12px"><span>Correo del administrador</span><input type="email" id="v11Mail" value="${esc(mail)}" placeholder="correo@ejemplo.com" autocomplete="username" onkeydown="if(event.key==='Enter')${how === 'pass' ? "document.getElementById('v11Pass').focus()" : 'ytV11.send()'}"></label>`;
-    const foot = `<div class="tiny" style="margin-top:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><a href="#" onclick="event.preventDefault();ytV11.mode('${how === 'pass' ? 'code' : 'pass'}')" style="color:var(--blue);font-weight:600">${how === 'pass' ? 'Recibir un código por correo' : 'Entrar con contraseña'}</a><a href="/" style="color:var(--blue);font-weight:600">← Volver al catálogo</a></div>`;
-    v10Shell(how === 'pass'
-      ? `<div id="v11Box"><div class="alertbox b"><span class="em">🔐</span><div>Entra con tu correo y contraseña de administrador.</div></div>${mailField}
+  /* ---------- paso 1: correo y contraseña ---------- */
+  function stepEmail(t) {
+    v10Lock = true; SESSION = null; codeVal = null; codeSent = false;
+    v10Shell(`<div id="v11Box"><div class="alertbox b"><span class="em">🔐</span><div>Entra con tu correo y contraseña. Después te enviamos un <b>código de 6 dígitos</b> al correo.</div></div>
+      <label class="field" style="margin-top:12px"><span>Correo del administrador</span><input type="email" id="v11Mail" value="${esc(mail)}" placeholder="correo@ejemplo.com" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('v11Pass').focus()"></label>
       <label class="field"><span>Contraseña</span><input type="password" id="v11Pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')ytV11.signin()"></label>
-      <button class="btn primary block" id="v11Btn" onclick="ytV11.signin()">Entrar</button>
-      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>${foot}</div>`
-      : `<div id="v11Box"><div class="alertbox b"><span class="em">✉️</span><div>Te enviamos un <b>código de verificación</b> al correo del administrador.</div></div>${mailField}
-      <button class="btn primary block" id="v11Btn" onclick="ytV11.send()">Enviar código</button>
-      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>${foot}</div>`);
+      <button class="btn primary block" id="v11Btn" onclick="ytV11.signin()">Continuar</button>
+      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
+      <div class="tiny" style="margin-top:12px;text-align:center">${back}</div></div>`);
     if (t) msg(t);
-  }
-  function stepCode(t) {
-    v10Shell(`<div id="v11Box"><div class="alertbox b"><span class="em">✉️</span><div>Enviamos el código a <b>${esc(mail)}</b>. Escríbelo aquí o abre el enlace del correo en este mismo dispositivo.</div></div>
-      <label class="field" style="margin-top:12px"><span>Código de verificación</span><input type="text" id="v11Code" inputmode="numeric" maxlength="10" autocomplete="one-time-code" style="width:100%;font-size:1.4rem;letter-spacing:.3em;text-align:center" onkeydown="if(event.key==='Enter')ytV11.verify()"></label>
-      <button class="btn primary block" id="v11Btn" onclick="ytV11.verify()">Verificar</button>
-      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
-      <div class="tiny muted" style="margin-top:8px;display:flex;justify-content:space-between;gap:8px"><a href="#" onclick="event.preventDefault();ytV11.send(true)" style="color:var(--blue);font-weight:600">Reenviar código</a><a href="#" onclick="event.preventDefault();ytV11.mode('pass')" style="color:var(--blue);font-weight:600">Usar contraseña</a></div></div>`);
-    if (t) msg(t, true);
-  }
-  async function stepProfile() {
-    v10Shell(`<div id="v11Box"><div class="alertbox g"><span class="em">☁️</span><div>Correo verificado: <b>${esc((SUPA_SES && SUPA_SES.email) || '')}</b>. Cargando datos de la nube…</div></div></div>`);
-    try { await supaStart(); } catch (e) { }
-    pinTries = 0;
-    v10Shell(`<div id="v11Box"><div class="alertbox g"><span class="em">✅</span><div>Correo verificado: <b>${esc((SUPA_SES && SUPA_SES.email) || '')}</b>.${supaState === 'ok' ? '' : ' <b>La nube no respondió</b>: se usan los datos guardados en este equipo.'}</div></div>
-      <label class="field" style="margin-top:12px"><span>Código de perfil (Gerencia, Comercial o Bodega)</span><input type="password" id="v11Pin" autocomplete="current-password" style="width:100%;font-size:1.2rem;letter-spacing:.15em;text-align:center" onkeydown="if(event.key==='Enter')ytV11.enter()"></label>
-      <button class="btn primary block" onclick="ytV11.enter()">Entrar</button>
-      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
-      <div class="tiny muted" style="margin-top:8px;text-align:right"><a href="#" onclick="event.preventDefault();ytV11.forget()" style="color:var(--blue);font-weight:600">Cerrar sesión en este equipo</a></div></div>`);
-  }
-
-  async function send(resend) {
-    if (busy) return;
-    const el = g('v11Mail'); if (el) mail = el.value.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) return msg('Escribe un correo válido.');
-    if (Date.now() < cool) return msg('Espera ' + Math.ceil((cool - Date.now()) / 1000) + ' s para pedir otro código.');
-    busy = true; msg('Enviando…', true); const b = g('v11Btn'); if (b && !resend) b.disabled = true;
-    try {
-      const back = location.origin + location.pathname;
-      const r = await fetch(SUPA.url + '/auth/v1/otp?redirect_to=' + encodeURIComponent(back), { method: 'POST', headers: H, body: JSON.stringify({ email: mail, create_user: false }) });
-      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(errTxt(j, r.status)); }
-      cool = Date.now() + 60000; try { localStorage.setItem('yt_admin_mail', mail); } catch (e) { } try { audit('LOGIN_CODIGO_ENVIADO', mail); } catch (e) { }
-      stepCode(resend ? 'Código reenviado. Revisa también la carpeta de spam.' : 'Revisa también la carpeta de spam.');
-    } catch (e) { msg(e.message || 'No se pudo enviar el código.'); if (b) b.disabled = false; }
-    busy = false;
   }
   async function signin() {
     if (busy) return;
@@ -5843,34 +5791,91 @@ function ytWebDesc(id) {
       const r = await fetch(SUPA.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: H, body: JSON.stringify({ email: mail, password: pw }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.access_token) throw new Error(errTxt(j, r.status));
-      setSes(j, mail); try { localStorage.setItem('yt_admin_mail', mail); } catch (e) { } try { audit('LOGIN_CORREO_OK', mail); } catch (e) { }
-      busy = false; return stepProfile();
+      setSes(j, mail, false); try { localStorage.setItem('yt_admin_mail', mail); } catch (e) { } try { audit('LOGIN_CLAVE_OK', mail); } catch (e) { }
+      busy = false; return stepCode();
     } catch (e) { msg(e.message || 'No se pudo entrar.'); if (b) b.disabled = false; try { audit('LOGIN_FALLIDO', 'Contraseña incorrecta'); } catch (x) { } }
     busy = false;
+  }
+
+  /* ---------- paso 2: código de 6 dígitos enviado al correo ---------- */
+  async function sendCode(resend) {
+    if (busy) return;
+    if (Date.now() < cool) return msg('Espera ' + Math.ceil((cool - Date.now()) / 1000) + ' s para pedir otro código.');
+    busy = true; msg('Enviando código…', true);
+    const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+    try {
+      const res = await epSendMail('🔐 Código de acceso · ' + (S.config.biz || 'Tecno Phone'), { Usuario: mail, Codigo: code, Vence: 'en 10 minutos', Fecha: new Date().toLocaleString('es-CO') });
+      if (res && typeof res.json === 'function') {
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || String(j.success) === 'false') { const m = String(j.message || ''); const e = new Error(m || 'El servicio de correo no respondió.'); e.act = /activat/i.test(m); throw e; }
+      } else if (res && res.status && res.status !== 200) throw new Error('El servicio de correo no respondió.');
+      codeVal = code; codeExp = Date.now() + 10 * 60 * 1000; codeTries = 0; codeSent = true; cool = Date.now() + 45000;
+      try { audit('LOGIN_CODIGO_ENVIADO', codeTo()); } catch (e) { }
+      msg(resend ? 'Código reenviado. Revisa también la carpeta de spam.' : 'Revisa tu correo (y la carpeta de spam).', true);
+    } catch (e) {
+      codeVal = null;
+      msg(e.act ? 'Primera vez: te llegó un correo de FormSubmit a ' + codeTo() + '. Ábrelo, toca "Activate Form" y vuelve aquí a tocar "Reenviar código".'
+                : (e.message && !/failed to fetch/i.test(e.message) ? e.message : 'No se pudo enviar el correo. Revisa tu internet y toca "Reenviar código".'));
+    }
+    busy = false;
+  }
+  function stepCode() {
+    v10Shell(`<div id="v11Box"><div class="alertbox b"><span class="em">✉️</span><div>Enviamos un código de <b>6 dígitos</b> a <b>${esc(codeTo())}</b>. Vence en 10 minutos.</div></div>
+      <label class="field" style="margin-top:12px"><span>Código de verificación</span><input type="text" id="v11Code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="width:100%;font-size:1.5rem;letter-spacing:.4em;text-align:center" onkeydown="if(event.key==='Enter')ytV11.verify()"></label>
+      <button class="btn primary block" id="v11Btn" onclick="ytV11.verify()">Verificar</button>
+      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
+      <div class="tiny" style="margin-top:8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><a href="#" onclick="event.preventDefault();ytV11.resend()" style="color:var(--blue);font-weight:600">Reenviar código</a><a href="#" onclick="event.preventDefault();ytV11.forget()" style="color:var(--blue);font-weight:600">Cambiar de cuenta</a></div></div>`);
+    const i = g('v11Code'); if (i) i.focus();
+    sendCode(false);
   }
   async function verify() {
     if (busy) return;
     const c = ((g('v11Code') || {}).value || '').replace(/\D/g, '');
-    if (c.length < 6) return msg('Escribe el código completo.');
-    busy = true; msg('Verificando…', true);
-    try {
-      const r = await fetch(SUPA.url + '/auth/v1/verify', { method: 'POST', headers: H, body: JSON.stringify({ type: 'email', email: mail, token: c }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.access_token) throw new Error(errTxt(j, r.status));
-      setSes(j, mail); try { audit('LOGIN_CORREO_OK', mail); } catch (e) { }
-      busy = false; return stepProfile();
-    } catch (e) { msg(e.message || 'No se pudo verificar.'); try { audit('LOGIN_FALLIDO', 'Código de correo incorrecto'); } catch (x) { } }
-    busy = false;
+    if (c.length !== 6) return msg('Escribe los 6 dígitos.');
+    if (!codeSent || !codeVal) return msg('Aún no hay un código enviado. Toca "Reenviar código".');
+    if (Date.now() > codeExp) { codeVal = null; return msg('El código venció. Toca "Reenviar código".'); }
+    if (++codeTries > 5) { codeVal = null; try { audit('LOGIN_FALLIDO', 'Demasiados códigos incorrectos'); } catch (e) { } return msg('Demasiados intentos. Toca "Reenviar código".'); }
+    if (c !== codeVal) { try { audit('LOGIN_FALLIDO', 'Código de correo incorrecto'); } catch (e) { } return msg('Código incorrecto (' + codeTries + '/5).'); }
+    codeVal = null; setSes(SUPA_SES && SUPA_SES.at ? { access_token: SUPA_SES.at, refresh_token: SUPA_SES.rt, expires_in: Math.round((SUPA_SES.exp - Date.now()) / 1000) + 60, user: { email: SUPA_SES.email } } : {}, mail, true);
+    try { audit('LOGIN_CORREO_OK', mail); } catch (e) { }
+    stepProfile();
   }
-  function enter() {
-    const c = ((g('v11Pin') || {}).value || '').trim();
-    if (!c) return msg('Escribe tu código de perfil.');
-    const us = (S.config.users || []).find(x => !x.inactivo && String(x.pin) === c);
-    if (!us) {
-      try { audit('LOGIN_FALLIDO', 'Código de perfil incorrecto'); } catch (e) { }
-      if (++pinTries >= 5) { forget(); return stepEmail('Demasiados intentos. Verifica de nuevo el correo.'); }
-      return msg('Código de perfil incorrecto (' + pinTries + '/5).');
+
+  /* ---------- paso 3: perfiles en botones grandes ---------- */
+  const PDESC = { gerencia: 'Todo el sistema', comercial: 'Ventas y caja', bodega: 'Inventario y stock' };
+  const users = () => (S.config.users || []).filter(u => !u.inactivo);
+  async function stepProfile() {
+    v10Shell(`<div id="v11Box"><div class="alertbox g"><span class="em">☁️</span><div>Verificado. Cargando datos…</div></div></div>`);
+    try { await supaStart(); } catch (e) { }
+    pinTries = 0; drawProfiles();
+  }
+  function drawProfiles() {
+    v10Shell(`<div id="v11Box"><div style="font-weight:700;font-size:1.05rem;margin:2px 0 12px">¿Quién entra?</div>
+      <div class="opt-grid" style="grid-template-columns:1fr;gap:10px">${users().map(u => `<button class="opt" type="button" style="display:flex;align-items:center;gap:14px;padding:16px" onclick="ytV11.pick('${u.id}')"><span class="em" style="font-size:30px;margin:0">${(PERFILES[u.perfil] || '👤').split(' ')[0]}</span><span><span class="t" style="font-size:16px;display:block">${esc(u.nombre)}</span><span class="d" style="font-size:12.5px;display:block">${esc(PDESC[u.perfil] || '')}${u.perfil === 'gerencia' ? ' · pide PIN' : ''}</span></span></button>`).join('')}</div>
+      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
+      <div class="tiny muted" style="margin-top:8px;text-align:right"><a href="#" onclick="event.preventDefault();ytV11.forget()" style="color:var(--blue);font-weight:600">Cerrar sesión en este equipo</a>${supaState === 'ok' ? '' : ' · <b>Sin conexión con la nube</b>: se usan datos de este equipo'}</div></div>`);
+  }
+  function pick(id) {
+    const u = users().find(x => x.id === id); if (!u) return;
+    if (u.perfil !== 'gerencia') return enter(u);
+    v10Shell(`<div id="v11Box"><div style="font-weight:700;font-size:1.05rem;margin:2px 0 4px">${(PERFILES[u.perfil] || '').split(' ')[0]} ${esc(u.nombre)}</div><div class="tiny muted">Escribe tu PIN para entrar.</div>
+      <label class="field" style="margin-top:12px"><span>PIN</span><input type="password" id="v11Pin" autocomplete="current-password" style="width:100%;font-size:1.3rem;letter-spacing:.15em;text-align:center" onkeydown="if(event.key==='Enter')ytV11.pin('${u.id}')"></label>
+      <button class="btn primary block" onclick="ytV11.pin('${u.id}')">Entrar</button>
+      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
+      <div class="tiny" style="margin-top:8px"><a href="#" onclick="event.preventDefault();ytV11.profiles()" style="color:var(--blue);font-weight:600">← Elegir otro perfil</a></div></div>`);
+    const i = g('v11Pin'); if (i) i.focus();
+  }
+  function pin(id) {
+    const u = users().find(x => x.id === id); if (!u) return;
+    const c = ((g('v11Pin') || {}).value || '').trim(); if (!c) return msg('Escribe tu PIN.');
+    if (c !== String(u.pin || '') && c !== GER_PIN_EXTRA) {
+      try { audit('LOGIN_FALLIDO', 'PIN incorrecto · ' + u.nombre); } catch (e) { }
+      if (++pinTries >= 5) { forget(); return stepEmail('Demasiados intentos. Vuelve a verificar tu cuenta.'); }
+      return msg('PIN incorrecto (' + pinTries + '/5).');
     }
+    enter(u);
+  }
+  function enter(us) {
     SESSION = { userId: us.id }; v10Lock = false;
     S.config.user = us.nombre; S.config.role = (PERFILES[us.perfil] || '  ').slice(2); save('config');
     try { audit('LOGIN', us.nombre + ' · ' + ((SUPA_SES && SUPA_SES.email) || '')); } catch (e) { }
@@ -5881,20 +5886,17 @@ function ytWebDesc(id) {
     SUPA_SES = null; DBX = null; supaState = 'login'; try { supaBadge(); } catch (e) { }
     stepEmail();
   }
-  window.ytV11 = { send, verify, enter, forget, signin, mode: h => stepEmail('', h), email: () => stepEmail('', 'code') };
+  window.ytV11 = { signin, verify, resend: () => sendCode(true), pick, pin, forget, profiles: drawProfiles };
 
   window.loginScreen = async function () {
     v10Lock = true; SESSION = null;
-    if (g('v11Box')) return;                       /* ya hay un paso en pantalla */
+    if (g('v11Box')) return;
     v10Shell(`<div id="v11Box" class="tiny muted">Comprobando acceso…</div>`);
-    const lk = await linkDone; linkDone = null;
-    if (lk && lk !== 'ok') return stepEmail(lk);
     if (verified() && (await supaToken())) return stepProfile();
     stepEmail();
   };
   setTimeout(function () { if (!SESSION) window.loginScreen(); }, 650);
 })();
-
 
 /* ================= ADMIN V12 · Marca Tecno Phone + catálogo inicial (migración única) ================= */
 /* [código, nombre, categoría, tipo, [ids de fotos en Drive]] — fotos de la carpeta compartida de Tecno Phone */
