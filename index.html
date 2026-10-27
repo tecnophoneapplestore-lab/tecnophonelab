@@ -58,6 +58,7 @@ a{color:inherit}
 .hero-logo{display:block;height:58px;width:auto;margin:0 0 18px;filter:invert(1) drop-shadow(0 6px 18px rgba(0,0,0,.35))}
 .brand b{font-size:17px;font-weight:600;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar .sp{flex:1}
+a.icon-btn{text-decoration:none}
 .icon-btn{width:42px;height:42px;border-radius:var(--pill);display:grid;place-items:center;color:var(--ink);background:var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--hl),0 2px 8px -4px rgba(12,48,58,.2)}
 .icon-btn svg{width:20px;height:20px}
 .icon-btn.lbl span{display:none}
@@ -225,7 +226,7 @@ a{color:inherit}
   .card .name{font-size:15px}
   .card .price{font-size:17.5px}
   .dock{display:none}
-  .foot .cols{grid-template-columns:1.2fr 1fr 1fr}
+  .foot .cols{grid-template-columns:1.1fr 1.2fr 1fr}
   .foot .wrap>div:first-child{padding:32px 36px}
   .scrim{align-items:center;padding:32px}
   .sheet{max-width:980px;max-height:min(780px,100%);border-radius:32px;transform:translateY(18px) scale(.98);opacity:0;transition:transform .25s,opacity .25s}
@@ -241,10 +242,66 @@ a{color:inherit}
   .sheet h2{font-size:28px}
 }
 @media (min-width:1240px){ .grid{grid-template-columns:repeat(5,minmax(0,1fr))} }
+
+/* ---------- galería con carrusel y zoom suave ---------- */
+.pd-media{position:relative;overflow:hidden;touch-action:pan-x pan-y}
+.pd-track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.pd-track::-webkit-scrollbar{display:none}
+.pd-slide{flex:0 0 100%;height:100%;scroll-snap-align:center;scroll-snap-stop:always;overflow:hidden;background:#fff}
+.pd-slide img{width:100%;height:100%;object-fit:contain;background:#fff;transition:transform .5s cubic-bezier(.2,.8,.2,1);will-change:transform;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
+.pd-media.zooming .pd-slide img{transform:scale(1.6)}
+.pd-media.zooming{cursor:zoom-in}
+@keyframes pdIn{from{transform:scale(1.18);opacity:.2}to{transform:scale(1);opacity:1}}
+.scrim.on .pd-slide:first-child img{animation:pdIn .95s cubic-bezier(.2,.8,.2,1) backwards}
+.pd-dots{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px;padding:6px 10px;border-radius:9999px;background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.9);pointer-events:none}
+.pd-dots i{width:6px;height:6px;border-radius:50%;background:rgba(27,33,38,.28);transition:width .25s,background .25s}
+.pd-dots i.on{width:18px;border-radius:4px;background:var(--ink)}
+.pd-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;display:none;place-items:center;background:rgba(255,255,255,.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.95);box-shadow:var(--hl),0 6px 16px -8px rgba(12,48,58,.4);z-index:2}
+.pd-nav.prev{left:10px;transform:translateY(-50%) scaleX(-1)} .pd-nav.next{right:10px}
+.pd-nav svg{width:18px;height:18px}
+@media (hover:hover) and (pointer:fine){.pd-nav{display:grid;opacity:0;transition:opacity .2s}.pd-media:hover .pd-nav{opacity:1}}
+.pd-hint{position:absolute;left:50%;top:12px;transform:translateX(-50%);padding:6px 12px;border-radius:9999px;font-size:12px;font-weight:500;color:var(--ink);white-space:nowrap;background:rgba(255,255,255,.7);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.95);pointer-events:none;animation:hintOut .5s ease 3.4s forwards}
+@keyframes hintOut{to{opacity:0;visibility:hidden}}
+.pd-media.zooming .pd-hint{opacity:0}
+
+/* ---------- contacto ---------- */
+.contact{margin-top:44px}
+.contact-head h2{font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.contact-head p{color:var(--slate);margin-top:6px}
+.contact-grid{display:grid;gap:12px;margin-top:18px}
+.wa-card{position:relative;overflow:hidden;isolation:isolate;border-radius:var(--r-card);padding:24px 20px;color:#fff;
+  background:radial-gradient(90% 80% at 100% 0%,rgba(25,193,214,.5),transparent 60%),linear-gradient(155deg,#121C22 0%,#173540 55%,#0D5562 100%);
+  box-shadow:0 24px 50px -28px rgba(12,48,58,.75),inset 0 1px 0 rgba(255,255,255,.18);display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.wa-card::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:28px 28px;-webkit-mask-image:radial-gradient(100% 90% at 80% 0%,#000 20%,transparent 75%);mask-image:radial-gradient(100% 90% at 80% 0%,#000 20%,transparent 75%)}
+.wa-card h3{font-size:24px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin-top:4px}
+.wa-card p{color:rgba(255,255,255,.74);font-size:15px;max-width:34ch}
+.wa-card .btn{margin-top:8px}
+.wa-call{display:inline-flex;align-items:center;gap:8px;color:rgba(255,255,255,.85);font-size:14px;font-weight:500;text-decoration:none;margin-top:2px}
+.wa-call svg{width:18px;height:18px}
+.sedes{display:grid;gap:10px}
+.sede{display:flex;align-items:center;gap:14px;padding:14px;border-radius:22px;background:var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--hl),var(--lift)}
+.sede-ic{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:var(--teal-strong);background:rgba(14,147,165,.1);border:1px solid rgba(14,147,165,.14)}
+.sede-ic svg{width:21px;height:21px}
+.sede-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sede-t b{font-size:15px;font-weight:600;letter-spacing:-.015em;line-height:1.25}
+.sede-t span{font-size:14px;color:var(--ink)}
+.sede-t small{font-size:12.5px;color:var(--steel)}
+.sede-go{flex:none;display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:9999px;font-size:13px;font-weight:600;color:var(--teal-strong);text-decoration:none;background:rgba(14,147,165,.09);border:1px solid rgba(14,147,165,.16)}
+.sheet-wa{margin-top:16px}
+.sheet-wa .wa-card{padding:20px 18px}
+.sheet-h{font-size:13px;font-weight:600;color:var(--slate);margin:20px 0 10px}
+@media (max-width:420px){.sede{flex-wrap:wrap}.sede-go{width:100%;justify-content:center}}
+@media (min-width:960px){
+  .contact{margin-top:64px}
+  .contact-head h2{font-size:34px}
+  .contact-grid{grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:16px;align-items:stretch}
+  .wa-card{padding:36px 32px;justify-content:center}
+  .sedes{grid-template-columns:1fr;align-content:stretch}
+}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .top{background:rgba(255,255,255,.94)} .dock{background:rgba(18,26,31,.94)} .sheet{background:#F7FAFB}
 }
-@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} .pd-track{scroll-behavior:auto} }
 </style>
 </head>
 <body>
@@ -286,6 +343,7 @@ a{color:inherit}
   </section>
   <div class="meta"><span id="count" aria-live="polite"></span><span id="catLabel"></span></div>
   <section class="grid" id="grid" aria-label="Productos"></section>
+  <section class="contact" id="contacto" aria-labelledby="contactTitle" hidden></section>
 </main>
 
 <footer class="foot" id="foot" hidden>
@@ -319,18 +377,24 @@ a{color:inherit}
    es "Tecno Phone"; así nunca se mezclan datos de otra marca. */
 const BRAND = {
   nombre: 'Tecno Phone',
+  razon: 'TECNOPHONELAB',
+  nit: '1110546470-2',
   ciudad: 'Ibagué, Tolima',
   eslogan: 'Tecnología y accesorios',
-  direccion: '',     /* ej. 'Cra 3 # 12-34, Centro' */
-  whatsapp: '',      /* 10 dígitos, ej. '3001234567' — número que recibe los pedidos */
-  telefono: '',
-  correo: ''
+  whatsapp: '3167019091',     /* número que recibe los pedidos */
+  telefono: '3167019091',
+  correo: '',
+  sedes: [
+    { n: 'Centro Comercial Los Panches', d: 'Local 202 · Segundo piso', q: 'Centro Comercial Los Panches, Ibagué, Tolima' },
+    { n: 'Centro Comercial Los Panches', d: 'Puesto 22 · Primer piso',  q: 'Centro Comercial Los Panches, Ibagué, Tolima' },
+    { n: 'Pasaje Comercial La 14',       d: 'Local P115',               q: 'Pasaje Comercial La 14, Ibagué, Tolima' }
+  ]
 };
 const CFG = {
   url: 'https://muvbocrwuumyofzeegol.supabase.co',
   key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11dmJvY3J3dXVteW9memVlZ29sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTU0MjAsImV4cCI6MjEwNzIzMTQyMH0.K4K3gSBerILasggKGy9WUf3xCCLKRdi-L9BmULboMC8',
   refreshMs: 5 * 60 * 1000,
-  lowStock: 2
+  lowStock: 0      /* 'Últimas unidades' cuando el stock es menor o igual a este número (0 = desactivado) */
 };
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -345,6 +409,7 @@ const IC = {
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
   mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>'
 };
 
@@ -365,7 +430,7 @@ function status(it) {
   if (it.agotado) return 'out';
   if (it.sinInv) return 'ok';
   if (it.stock <= 0) return 'out';
-  if (it.stock <= CFG.lowStock) return 'low';
+  if (CFG.lowStock > 0 && it.stock <= CFG.lowStock) return 'low';
   return 'ok';
 }
 const ST_TXT = { ok: 'Disponible', low: 'Últimas unidades', out: 'Agotado' };
@@ -395,7 +460,7 @@ async function load(silent) {
     ST.at = (cat && cat.data && cat.data.at) || '';
     ST.loaded = true; ST.error = null; ST.fetchedAt = Date.now(); ST.published = !!cat;
     if (ST.cat !== 'all' && !ST.items.some(i => i.cat === ST.cat)) ST.cat = 'all';
-    applySite(); renderChips(); renderGrid(); renderFoot();
+    applySite(); renderChips(); renderGrid(); renderContact(); renderFoot();
     routeFromHash();
   } catch (e) {
     console.warn('Catálogo:', e);
@@ -447,7 +512,7 @@ function brandSite(ad) {
   const key = s => norm(s).replace(/[^a-z0-9]/g, '');
   const same = !!ad.biz && key(ad.biz).includes(key(BRAND.nombre));
   const pick = (mine, theirs) => mine || (same ? (theirs || '') : '');
-  return { biz: BRAND.nombre, sub: pick(BRAND.eslogan, ad.sub), ciudad: pick(BRAND.ciudad, ad.ciudad), dir: pick(BRAND.direccion, ad.dir),
+  return { biz: BRAND.nombre, sub: pick(BRAND.eslogan, ad.sub), ciudad: pick(BRAND.ciudad, ad.ciudad), dir: '',
     wa: pick(BRAND.whatsapp, ad.wa), tel: pick(BRAND.telefono, ad.tel), email: pick(BRAND.correo, ad.email), cats: ad.cats || [] };
 }
 function waLink(text) { const n = waNumber(); return n ? 'https://wa.me/' + n + '?text=' + encodeURIComponent(text) : ''; }
@@ -566,34 +631,71 @@ window.addEventListener('popstate', () => { if (layerOpen) closeLayer(); else ro
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && layerOpen) back(); });
 
 /* ---------------- detalle de producto ---------------- */
-const PD = { it: null, color: null, model: null, img: null };
+const PD = { it: null, color: null, model: null, imgs: [], cur: 0 };
+const bigUrl = s => String(s).replace(/sz=w\d+/, 'sz=w1400');
+function imgFail(el) { if (!el.dataset.f && el.dataset.alt && el.dataset.alt !== el.src) { el.dataset.f = 1; el.src = el.dataset.alt; } else el.replaceWith(noImgEl()); }
 function openProduct(key, push = true) {
   const it = ST.items.find(i => i.key === key); if (!it) return;
-  PD.it = it; PD.color = null; PD.model = null; PD.img = null;
-  const sc = openLayer(`<div class="body"><div class="pd"><div><div class="pd-media" id="pdMedia"></div><div class="pd-thumbs" id="pdThumbs"></div></div><div class="pd-info" id="pdInfo"></div></div></div><div class="act" id="pdAct"></div>`,
+  PD.it = it; PD.color = null; PD.model = null; PD.imgs = []; PD.cur = 0;
+  const sc = openLayer(`<div class="body"><div class="pd"><div class="pd-left"><div class="pd-media" id="pdMedia"></div><div class="pd-thumbs" id="pdThumbs"></div></div><div class="pd-info" id="pdInfo"></div></div></div><div class="act" id="pdAct"></div>`,
     { label: it.name, kind: 'product', push, hash: location.pathname + location.search + '#p=' + encodeURIComponent(it.key) });
   it.colores.forEach(c => { if (c.k && !c.url) needImg(c.k); });
   if (it.hasImg) needImg(it.id);
-  drawProduct();
+  buildGallery(); drawInfo();
   const t0 = Date.now();
-  const poll = setInterval(() => { if (!sc.isConnected || PD.it !== it) return clearInterval(poll); if (pendingPD() && Date.now() - t0 < 15000) return; clearInterval(poll); drawProduct(); }, 250);
+  const poll = setInterval(() => { if (!sc.isConnected || PD.it !== it) return clearInterval(poll); if (pendingPD() && Date.now() - t0 < 15000) return; clearInterval(poll); buildGallery(); drawInfo(); }, 250);
 }
 function pendingPD() { const it = PD.it; return (it.hasImg && !(it.id in IMG)) || it.colores.some(c => c.k && !c.url && !(c.k in IMG)); }
 function pdImages(it) {
   const out = [];
-  const main = it.img || (it.hasImg && IMG[it.id]) || '';
-  if (main) out.push({ src: main, n: '' });
-  it.colores.forEach(c => { const s = c.url || IMG[c.k]; if (s) out.push({ src: s, n: c.n, off: c.off }); });
+  const add = (src, n, off) => { if (!src) return; const ex = out.find(o => o.src === src); if (ex) { if (n && !ex.n) { ex.n = n; ex.off = !!off; } return; } out.push({ src, n: n || '', off: !!off }); };
+  add(it.img || (it.hasImg && IMG[it.id]) || '', '');
+  it.colores.forEach(c => add(c.url || IMG[c.k], c.n, c.off));
   return out;
 }
-function drawProduct() {
+function buildGallery() {
+  const media = $('#pdMedia'); if (!media) return;
+  const imgs = pdImages(PD.it), sig = imgs.map(i => i.src).join('|');
+  if (media.dataset.sig === sig) return;
+  media.dataset.sig = sig; PD.imgs = imgs; PD.cur = Math.min(PD.cur, Math.max(0, imgs.length - 1));
+  if (!imgs.length) { media.innerHTML = pendingPD() ? '' : `<div class="noimg">${IC.pkg}<span>Producto sin foto</span></div>`; $('#pdThumbs').innerHTML = ''; return; }
+  const many = imgs.length > 1, fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
+  media.innerHTML = `<div class="pd-track" id="pdTrack">${imgs.map((im, i) => `<div class="pd-slide"><img src="${esc(bigUrl(im.src))}" data-alt="${esc(im.src)}" onerror="imgFail(this)" alt="${esc(PD.it.name + (im.n ? ' · ' + im.n : ''))}" draggable="false" decoding="async"></div>`).join('')}</div>
+    ${many ? `<button class="pd-nav prev" type="button" data-nav="-1" aria-label="Foto anterior">${IC.chev}</button><button class="pd-nav next" type="button" data-nav="1" aria-label="Foto siguiente">${IC.chev}</button><div class="pd-dots" id="pdDots">${imgs.map((_, i) => `<i class="${i === PD.cur ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+    <span class="pd-hint">${fine ? 'Pasa el mouse para acercar' : 'Mantén presionado para acercar'}</span>`;
+  $('#pdThumbs').innerHTML = many ? imgs.map((i, k) => `<button type="button" aria-label="${esc(i.n || 'Foto ' + (k + 1))}" aria-pressed="${k === PD.cur}" data-i="${k}"><img src="${esc(i.src)}" alt=""></button>`).join('') : '';
+  bindGallery(media);
+}
+function goSlide(i) { const t = $('#pdTrack'); if (t) t.scrollTo({ left: i * t.clientWidth, behavior: 'smooth' }); }
+function bindGallery(media) {
+  const track = $('#pdTrack'); if (!track) return;
+  let raf = 0;
+  const setCur = i => {
+    if (i === PD.cur && media.dataset.init) return; PD.cur = i; media.dataset.init = 1;
+    $$('#pdDots i').forEach((d, k) => d.classList.toggle('on', k === i));
+    $$('#pdThumbs button').forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)));
+    if (PD.it.colores.length) { const n = PD.imgs[i] && PD.imgs[i].n; const nc = n && PD.it.colores.some(c => c.n === n && !c.off) ? n : null; if (nc !== PD.color) { PD.color = nc; drawInfo(); } }
+  };
+  track.addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => setCur(Math.max(0, Math.min(PD.imgs.length - 1, Math.round(track.scrollLeft / track.clientWidth))))); }, { passive: true });
+  if (PD.cur) track.scrollLeft = PD.cur * track.clientWidth;
+  /* acercamiento suave: pasar el mouse (computador) o mantener el dedo (celular) */
+  const cur = () => { const sl = track.children[PD.cur]; return sl && sl.querySelector('img'); };
+  const origin = (x, y) => { const im = cur(); if (!im) return; const r = im.parentElement.getBoundingClientRect(); im.style.transformOrigin = Math.max(0, Math.min(100, (x - r.left) / r.width * 100)) + '% ' + Math.max(0, Math.min(100, (y - r.top) / r.height * 100)) + '%'; };
+  let on = false, hold = 0, sx = 0, sy = 0;
+  const start = (x, y) => { on = true; origin(x, y); media.classList.add('zooming'); };
+  const stop = () => { clearTimeout(hold); if (on) { on = false; media.classList.remove('zooming'); } };
+  if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
+    media.addEventListener('mouseenter', e => start(e.clientX, e.clientY));
+    media.addEventListener('mousemove', e => { if (on) origin(e.clientX, e.clientY); });
+    media.addEventListener('mouseleave', stop);
+  }
+  media.addEventListener('touchstart', e => { if (e.touches.length !== 1) return stop(); const t = e.touches[0]; sx = t.clientX; sy = t.clientY; clearTimeout(hold); hold = setTimeout(() => start(sx, sy), 260); }, { passive: true });
+  media.addEventListener('touchmove', e => { const t = e.touches[0]; if (on) { e.preventDefault(); origin(t.clientX, t.clientY); } else if (Math.hypot(t.clientX - sx, t.clientY - sy) > 9) clearTimeout(hold); }, { passive: false });
+  media.addEventListener('touchend', stop); media.addEventListener('touchcancel', stop);
+  media.addEventListener('contextmenu', e => e.preventDefault());
+}
+function drawInfo() {
   const it = PD.it; if (!it || !$('#pdInfo')) return;
-  const imgs = pdImages(it);
-  if (!PD.img && imgs.length) PD.img = imgs[0].src;
-  $('#pdMedia').innerHTML = PD.img ? `<img src="${esc(PD.img)}" alt="${esc(it.name)}" onerror="this.replaceWith(noImgEl())">` : (pendingPD() ? '' : `<div class="noimg">${IC.pkg}<span>Producto sin foto</span></div>`);
-  $('#pdThumbs').innerHTML = imgs.length > 1 ? imgs.map(i => `<button type="button" aria-label="${esc(i.n || 'Foto principal')}" aria-pressed="${i.src === PD.img}" data-src="${esc(i.src)}"><img src="${esc(i.src)}" alt=""></button>`).join('') : '';
-  $('#pdThumbs').style.display = imgs.length > 1 ? '' : 'none';
-
   const cols = it.colores, models = it.refs;
   const price = it.price ? `<div class="pd-price">${money(it.price)}</div>` : `<div class="pd-price ask">Precio a consultar</div>`;
   $('#pdInfo').innerHTML = `<div class="sub">${esc(it.cat)}${it.sub ? ' · ' + esc(it.sub) : ''}</div>
@@ -604,7 +706,6 @@ function drawProduct() {
     ${models.length ? `<div class="pd-sec"><h3>${it.tipo === 'normal' ? 'Compatible con' : 'Elige tu modelo'}${PD.model ? ': ' + esc(PD.model) : ''}</h3><div class="opts">${models.map(m => `<button class="opt" type="button" data-model="${esc(m.n)}" aria-pressed="${PD.model === m.n}" ${m.off ? 'disabled title="Agotado"' : ''}>${esc(m.n)}</button>`).join('')}</div></div>` : ''}
     <div class="pd-sec"><h3>Descripción</h3>${it.desc ? `<p class="pd-desc">${esc(it.desc)}</p>` : `<p class="pd-desc none">Este producto aún no tiene descripción publicada. Escríbenos y te damos los detalles.</p>`}</div>
     <div class="pd-sec"><dl class="kv"><dt>Referencia</dt><dd>${esc(it.ref)}</dd>${it.brand ? `<dt>Marca</dt><dd>${esc(it.brand)}</dd>` : ''}<dt>Categoría</dt><dd>${esc(it.cat)}</dd></dl></div>`;
-
   const wa = waLink(waText(it));
   $('#pdAct').innerHTML = (wa ? `<a class="btn primary" style="flex:1" href="${esc(wa)}" target="_blank" rel="noopener">${IC.chat}${it.s === 'out' ? 'Preguntar disponibilidad' : 'Consultar por WhatsApp'}</a>`
     : `<div class="sub" style="flex:1;align-self:center">El contacto por WhatsApp no está configurado.</div>`) +
@@ -622,13 +723,14 @@ function productURL(it) { return location.origin + location.pathname + '#p=' + e
 document.addEventListener('click', e => {
   const card = e.target.closest('.card[data-key]'); if (card) return openProduct(card.dataset.key);
   const chip = e.target.closest('[data-cat]'); if (chip) { if (layerOpen === 'cats') { back(); } return setCat(chip.dataset.cat); }
-  const th = e.target.closest('#pdThumbs [data-src]'); if (th) { PD.img = th.dataset.src; return drawProduct(); }
+  const nv = e.target.closest('.pd-nav'); if (nv) return goSlide(Math.max(0, Math.min(PD.imgs.length - 1, PD.cur + Number(nv.dataset.nav))));
+  const th = e.target.closest('#pdThumbs [data-i]'); if (th) return goSlide(Number(th.dataset.i));
   const co = e.target.closest('[data-color]'); if (co && !co.disabled) {
     PD.color = PD.color === co.dataset.color ? null : co.dataset.color;
-    const c = PD.it.colores.find(x => x.n === PD.color); const s = c && (c.url || IMG[c.k]); if (s) PD.img = s;
-    return drawProduct();
+    const idx = PD.color ? PD.imgs.findIndex(i => i.n === PD.color) : -1; if (idx >= 0) goSlide(idx);
+    return drawInfo();
   }
-  const mo = e.target.closest('[data-model]'); if (mo && !mo.disabled) { PD.model = PD.model === mo.dataset.model ? null : mo.dataset.model; return drawProduct(); }
+  const mo = e.target.closest('[data-model]'); if (mo && !mo.disabled) { PD.model = PD.model === mo.dataset.model ? null : mo.dataset.model; return drawInfo(); }
   if (e.target.closest('#pdShare')) return share(PD.it);
 });
 async function share(it) {
@@ -638,21 +740,30 @@ async function share(it) {
 }
 
 /* ---------------- contacto ---------------- */
-function contactRows() {
-  const s = ST.site, rows = [];
-  const a = addr(), wa = waNumber();
-  if (a) rows.push(`<li><a href="${esc(mapLink())}" target="_blank" rel="noopener">${IC.pin}<span class="t">${esc(a)}<small>Ver en el mapa</small></span></a></li>`);
-  if (wa) rows.push(`<li><a href="${esc(waLink('Hola, ' + bizName() + '. Vengo del catálogo web.'))}" target="_blank" rel="noopener">${IC.chat}<span class="t">WhatsApp<small>${esc(prettyPhone(s.wa || s.tel))}</small></span></a></li>`);
-  if (s.tel) rows.push(`<li><a href="tel:+57${esc(digits(s.tel))}">${IC.phone}<span class="t">Llamar<small>${esc(prettyPhone(s.tel))}</small></span></a></li>`);
-  if (s.email) rows.push(`<li><a href="mailto:${esc(s.email)}">${IC.mail}<span class="t">Correo<small>${esc(s.email)}</small></span></a></li>`);
-  return rows;
+const sedeMap = x => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(x.q);
+const waHello = () => waLink('Hola, ' + bizName() + '. Vengo del catálogo web y quiero información.');
+function sedesHTML() {
+  return BRAND.sedes.map(x => `<article class="sede"><span class="sede-ic">${IC.pin}</span><div class="sede-t"><b>${esc(x.n)}</b><span>${esc(x.d)}</span><small>${esc(BRAND.ciudad)}</small></div><a class="sede-go" href="${esc(sedeMap(x))}" target="_blank" rel="noopener" aria-label="Cómo llegar a ${esc(x.n)}, ${esc(x.d)}">Cómo llegar</a></article>`).join('');
+}
+function waCardHTML() {
+  const wa = waHello(), n = prettyPhone(ST.site.wa || ST.site.tel);
+  return `<div class="wa-card"><span class="hero-pill"><i></i><span>Pedidos y consultas</span></span>
+    <h3>Escríbenos por WhatsApp</h3><p>Consulta disponibilidad, precios y referencias de cualquier producto.</p>
+    ${wa ? `<a class="btn primary" href="${esc(wa)}" target="_blank" rel="noopener">${IC.chat}${esc(n)}</a>` : ''}
+    ${ST.site.tel ? `<a class="wa-call" href="tel:+57${esc(digits(ST.site.tel))}">${IC.phone}Llamar al ${esc(prettyPhone(ST.site.tel))}</a>` : ''}</div>`;
+}
+function renderContact() {
+  const c = $('#contacto'); if (!c) return;
+  c.innerHTML = `<div class="contact-head"><h2 id="contactTitle">Visítanos o escríbenos</h2><p>${BRAND.sedes.length} puntos de atención en ${esc(BRAND.ciudad.split(',')[0])}.</p></div>
+    <div class="contact-grid">${waCardHTML()}<div class="sedes">${sedesHTML()}</div></div>`;
+  c.hidden = false;
 }
 function openContact(push = true) {
-  const rows = contactRows();
-  openLayer(`<div class="body"><h2 style="padding-right:40px">${esc(bizName())}</h2>${ST.site.sub ? `<p class="sub" style="margin-top:4px">${esc(ST.site.sub)}</p>` : ''}
-    ${rows.length ? `<ul class="list">${rows.join('')}</ul>` : `<p class="sub" style="margin-top:16px">Los datos de contacto aún no están configurados.</p>`}
-    <a class="btn ghost block sm" href="/admin" style="margin-top:14px">Acceso administrativo</a></div>`,
-    { label: 'Contacto y ubicación', kind: 'contact', narrow: true, push });
+  openLayer(`<div class="body"><h2 style="padding-right:44px">${esc(bizName())}</h2><p class="sub" style="margin-top:4px">${esc(BRAND.razon)} · NIT ${esc(BRAND.nit)}</p>
+    <div class="sheet-wa">${waCardHTML()}</div>
+    <h3 class="sheet-h">Nuestras sedes</h3><div class="sedes">${sedesHTML()}</div>
+    <a class="btn ghost block sm" href="/admin" style="margin-top:16px">Acceso administrativo</a></div>`,
+    { label: 'Contacto y ubicación', kind: 'contact', push });
 }
 function openCats(push = true) {
   const cats = catList();
@@ -676,12 +787,11 @@ $$('.dock [data-dock]').forEach(b => b.addEventListener('click', () => {
 
 /* ---------------- pie ---------------- */
 function renderFoot() {
-  const s = ST.site, f = $('#foot'), a = addr();
-  const upd = ST.at ? new Date(ST.at) : null;
+  const s = ST.site, f = $('#foot'), upd = ST.at ? new Date(ST.at) : null;
   f.hidden = false;
-  $('#footCols').innerHTML = `<div><b>${esc(bizName())}</b>${s.sub ? `<div style="margin-top:4px">${esc(s.sub)}</div>` : ''}</div>
-    ${a ? `<div>${esc(a)}<br><a href="${esc(mapLink())}" target="_blank" rel="noopener">Ver en el mapa</a></div>` : ''}
-    ${(s.tel || waNumber() || s.email) ? `<div>${s.tel ? `Tel. <a href="tel:+57${esc(digits(s.tel))}">${esc(prettyPhone(s.tel))}</a><br>` : ''}${waNumber() ? `<a href="${esc(waLink('Hola, ' + bizName() + '. Vengo del catálogo web.'))}" target="_blank" rel="noopener">Escribir por WhatsApp</a><br>` : ''}${s.email ? `<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>` : ''}</div>` : ''}`;
+  $('#footCols').innerHTML = `<div><b>${esc(bizName())}</b><div style="margin-top:4px">${esc(s.sub || '')}</div><div style="margin-top:10px;font-size:13px">${esc(BRAND.razon)}<br>NIT ${esc(BRAND.nit)}</div></div>
+    <div><b>Sedes en ${esc(BRAND.ciudad.split(',')[0])}</b>${BRAND.sedes.map(x => `<div style="margin-top:6px">${esc(x.n)}<br><span style="color:var(--steel)">${esc(x.d)}</span></div>`).join('')}</div>
+    <div><b>Contacto</b>${waNumber() ? `<div style="margin-top:6px"><a href="${esc(waHello())}" target="_blank" rel="noopener">WhatsApp ${esc(prettyPhone(s.wa || s.tel))}</a></div>` : ''}${s.tel ? `<div style="margin-top:6px"><a href="tel:+57${esc(digits(s.tel))}">Llamar ${esc(prettyPhone(s.tel))}</a></div>` : ''}</div>`;
   $('#footFine').innerHTML = `<a href="/admin" class="adm-link">Acceso administrativo</a><span>Precios en pesos colombianos. La disponibilidad se confirma por WhatsApp.</span>${upd && !isNaN(upd) ? `<span>Actualizado el ${upd.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span>` : ''}`;
 }
 
@@ -697,6 +807,7 @@ window.addEventListener('scroll', () => $('#top').classList.toggle('scrolled', w
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ST.fetchedAt > 60000) load(true); });
 setInterval(() => { if (!document.hidden) load(true); }, CFG.refreshMs);
 renderGrid();
+renderContact();
 load();
 </script>
 </body>

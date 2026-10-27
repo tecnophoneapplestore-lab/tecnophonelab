@@ -5708,7 +5708,7 @@ setTimeout(function(){if(!SESSION)window.loginScreen()},600);
    'legacy'   → flujo V10 anterior: el código se genera y se compara en el navegador. Solo para emergencias. */
 var ADMIN_LOGIN_MODE = 'supabase';
 var ADMIN_EMAIL_DEF = '';   /* opcional: correo fijo. Debe existir en Supabase → Authentication → Users */
-var ADMIN_REVERIFY_H = 12;                         /* horas antes de pedir de nuevo el código del correo */
+var ADMIN_REVERIFY_H = 168;                        /* horas (7 días) antes de pedir de nuevo correo y contraseña */
 
 /* ---- Catálogo público: solo datos aptos para clientes (sin usuarios, PIN, costos ni configuración interna) ---- */
 function ytPublicSite() {
@@ -5758,6 +5758,7 @@ function ytWebDesc(id) {
   const mark = () => { try { localStorage.setItem(VK, JSON.stringify({ email: SUPA_SES.email, at: Date.now() })); } catch (e) { } };
   const errTxt = (j, st) => {
     const m = String((j && (j.msg || j.error_description || j.message || j.error)) || '');
+    if (/invalid login|invalid_credentials|invalid grant/i.test(m)) return 'Correo o contraseña incorrectos.';
     if (/signup|not found|not allowed/i.test(m)) return 'Ese correo no está autorizado. Debe existir en Supabase → Authentication → Users.';
     if (st === 429 || /rate limit|security purposes|too many/i.test(m)) return 'Se pidieron demasiados códigos. Espera unos minutos y vuelve a intentar.';
     if (/expired|invalid|otp/i.test(m)) return 'El código no es válido o ya venció. Pide uno nuevo.';
@@ -5783,13 +5784,18 @@ function ytWebDesc(id) {
   }
   linkDone = linkSession().catch(() => 'No se pudo validar el enlace.');
 
-  function stepEmail(t) {
-    v10Lock = true; SESSION = null;
-    v10Shell(`<div id="v11Box"><div class="alertbox b"><span class="em">🔐</span><div>Para entrar al portal te enviamos un <b>código de verificación</b> al correo autorizado.</div></div>
-      <label class="field" style="margin-top:12px"><span>Correo autorizado</span><input type="email" id="v11Mail" value="${esc(mail)}" placeholder="correo del administrador" autocomplete="username" onkeydown="if(event.key==='Enter')ytV11.send()"></label>
+  function stepEmail(t, how) {
+    v10Lock = true; SESSION = null; how = how || 'pass';
+    const mailField = `<label class="field" style="margin-top:12px"><span>Correo del administrador</span><input type="email" id="v11Mail" value="${esc(mail)}" placeholder="correo@ejemplo.com" autocomplete="username" onkeydown="if(event.key==='Enter')${how === 'pass' ? "document.getElementById('v11Pass').focus()" : 'ytV11.send()'}"></label>`;
+    const foot = `<div class="tiny" style="margin-top:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><a href="#" onclick="event.preventDefault();ytV11.mode('${how === 'pass' ? 'code' : 'pass'}')" style="color:var(--blue);font-weight:600">${how === 'pass' ? 'Recibir un código por correo' : 'Entrar con contraseña'}</a><a href="/" style="color:var(--blue);font-weight:600">← Volver al catálogo</a></div>`;
+    v10Shell(how === 'pass'
+      ? `<div id="v11Box"><div class="alertbox b"><span class="em">🔐</span><div>Entra con tu correo y contraseña de administrador.</div></div>${mailField}
+      <label class="field"><span>Contraseña</span><input type="password" id="v11Pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')ytV11.signin()"></label>
+      <button class="btn primary block" id="v11Btn" onclick="ytV11.signin()">Entrar</button>
+      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>${foot}</div>`
+      : `<div id="v11Box"><div class="alertbox b"><span class="em">✉️</span><div>Te enviamos un <b>código de verificación</b> al correo del administrador.</div></div>${mailField}
       <button class="btn primary block" id="v11Btn" onclick="ytV11.send()">Enviar código</button>
-      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
-      <div class="tiny" style="margin-top:10px;text-align:center"><a href="/" style="color:var(--blue);font-weight:600">← Volver al catálogo</a></div></div>`);
+      <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>${foot}</div>`);
     if (t) msg(t);
   }
   function stepCode(t) {
@@ -5797,7 +5803,7 @@ function ytWebDesc(id) {
       <label class="field" style="margin-top:12px"><span>Código de verificación</span><input type="text" id="v11Code" inputmode="numeric" maxlength="10" autocomplete="one-time-code" style="width:100%;font-size:1.4rem;letter-spacing:.3em;text-align:center" onkeydown="if(event.key==='Enter')ytV11.verify()"></label>
       <button class="btn primary block" id="v11Btn" onclick="ytV11.verify()">Verificar</button>
       <div id="v11Msg" class="tiny" style="margin-top:10px;min-height:1em"></div>
-      <div class="tiny muted" style="margin-top:8px;display:flex;justify-content:space-between;gap:8px"><a href="#" onclick="event.preventDefault();ytV11.send(true)" style="color:var(--blue);font-weight:600">Reenviar código</a><a href="#" onclick="event.preventDefault();ytV11.email()" style="color:var(--blue);font-weight:600">Cambiar correo</a></div></div>`);
+      <div class="tiny muted" style="margin-top:8px;display:flex;justify-content:space-between;gap:8px"><a href="#" onclick="event.preventDefault();ytV11.send(true)" style="color:var(--blue);font-weight:600">Reenviar código</a><a href="#" onclick="event.preventDefault();ytV11.mode('pass')" style="color:var(--blue);font-weight:600">Usar contraseña</a></div></div>`);
     if (t) msg(t, true);
   }
   async function stepProfile() {
@@ -5824,6 +5830,22 @@ function ytWebDesc(id) {
       cool = Date.now() + 60000; try { localStorage.setItem('yt_admin_mail', mail); } catch (e) { } try { audit('LOGIN_CODIGO_ENVIADO', mail); } catch (e) { }
       stepCode(resend ? 'Código reenviado. Revisa también la carpeta de spam.' : 'Revisa también la carpeta de spam.');
     } catch (e) { msg(e.message || 'No se pudo enviar el código.'); if (b) b.disabled = false; }
+    busy = false;
+  }
+  async function signin() {
+    if (busy) return;
+    const el = g('v11Mail'); if (el) mail = el.value.trim().toLowerCase();
+    const pw = (g('v11Pass') || {}).value || '';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) return msg('Escribe un correo válido.');
+    if (!pw) return msg('Escribe la contraseña.');
+    busy = true; msg('Verificando…', true); const b = g('v11Btn'); if (b) b.disabled = true;
+    try {
+      const r = await fetch(SUPA.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: H, body: JSON.stringify({ email: mail, password: pw }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.access_token) throw new Error(errTxt(j, r.status));
+      setSes(j, mail); try { localStorage.setItem('yt_admin_mail', mail); } catch (e) { } try { audit('LOGIN_CORREO_OK', mail); } catch (e) { }
+      busy = false; return stepProfile();
+    } catch (e) { msg(e.message || 'No se pudo entrar.'); if (b) b.disabled = false; try { audit('LOGIN_FALLIDO', 'Contraseña incorrecta'); } catch (x) { } }
     busy = false;
   }
   async function verify() {
@@ -5859,7 +5881,7 @@ function ytWebDesc(id) {
     SUPA_SES = null; DBX = null; supaState = 'login'; try { supaBadge(); } catch (e) { }
     stepEmail();
   }
-  window.ytV11 = { send, verify, enter, forget, email: () => stepEmail() };
+  window.ytV11 = { send, verify, enter, forget, signin, mode: h => stepEmail('', h), email: () => stepEmail('', 'code') };
 
   window.loginScreen = async function () {
     v10Lock = true; SESSION = null;
@@ -5874,20 +5896,49 @@ function ytWebDesc(id) {
 })();
 
 
-/* ================= ADMIN V12 · Marca Tecno Phone (migración única de la configuración) ================= */
+/* ================= ADMIN V12 · Marca Tecno Phone + catálogo inicial (migración única) ================= */
+/* [código, nombre, categoría, tipo, [ids de fotos en Drive]] — fotos de la carpeta compartida de Tecno Phone */
+var TP_SEED = [["TP-AUD-0001","Audífonos 01","Audífonos","normal",["1CgO09RsHCl3YHki8MONkYan9bzBvkGIu"]],["TP-AUD-0002","Audífonos 02","Audífonos","normal",["11MavKXz1r1Z0FB9OJTVhVbVoON9bs6sp"]],["TP-AUD-0003","Audífonos 03","Audífonos","normal",["10KsZ5TICSXV7CSSYStH1GuSzWzvGUMSW"]],["TP-AUD-0004","Audífonos 04","Audífonos","normal",["1c_6Mp4WgLx5BRH_9tiovkURzkPnwppbX"]],["TP-AUD-0005","Audífonos 05","Audífonos","normal",["1JBjtn2CcZNGSkYOGYzww04breD6D3dfd"]],["TP-AUD-0006","Audífonos 06","Audífonos","normal",["1xhVFsMCtQMyXvUt5bUHqUm0EMeJYkIAK"]],["TP-AUD-0007","Audífonos 07","Audífonos","normal",["1AmZufdRrYRhm8h7_haXJtLt1jlSIwcnr"]],["TP-APP-0008","Apple Pencil","Apple Pencil","normal",["122t9Kisd_2B6OeFT7JvuhvXGjHnxN4g-"]],["TP-CAB-0009","Cable 01","Cables","normal",["1iub5uDts_0D61ozUz8goY4qM9uFZACFZ"]],["TP-CAB-0010","Cable 02","Cables","normal",["16vOfb57dMkqIU2iLcy3XLKHeLKphF2pu"]],["TP-CAB-0011","Cable 03","Cables","normal",["1GgmnwPP2zxRQiN6c5KKzB-Dkpl7WkvmE"]],["TP-BAT-0012","Batería 01","Baterías","normal",["1heADmtFS8C_0DYb_7qzWtXIu4Y2LfUcN"]],["TP-BAT-0013","Batería 02","Baterías","normal",["1HSepO2sPY30ceISYJHbifLPDmkFt2Iuy"]],["TP-FUN-0014","Funda tipo 1","Fundas","funda",["109daeQyzPws5NHxo6Ro1ib12nNE9P79J","1UokHWVudRQyKzTKZiLsOIzJeLzRuMvxY"]],["TP-FUN-0015","Funda tipo 2","Fundas","funda",["1192BSjR8JbBF2HTLmLGQZEJ-r_Q8PLq4"]],["TP-FUN-0016","Funda tipo 3","Fundas","funda",["1J4tJkCtD56Q50BBKqIufKgiBRvZemOe-"]],["TP-FUN-0017","Funda tipo 4","Fundas","funda",["1j05BOArlhO_bMNhOYY3YP15L65U2Vl0j"]],["TP-FUN-0018","Funda tipo 5","Fundas","funda",["1aAuEBjxkeld8MNAS1loaLRNS63vnAhTG","1N_RcvhQKJ0HYaNP9Xmm0Wq0IJvw2RmfN","1bKcKIbQGQcgK7X0luZT6T2MMKXr5kZcx"]],["TP-FUN-0019","Funda tipo 6","Fundas","funda",["15k7YnpYTYvpjCtOFOjCkWRC6O8M4AX4E"]],["TP-FUN-0020","Funda tipo 7","Fundas","funda",["12AvaGxzG4auFk-AIu17E3FLTAs5ocRmv"]],["TP-FUN-0021","Funda tipo 8","Fundas","funda",["1yjmMrRg4h_512_DP7B_CisRWBQiU8wpb"]],["TP-FUN-0022","Funda tipo 9","Fundas","funda",["1_Ny8ntTwBBNy8RAm8Hl-PPa7Jsg3fKZs"]],["TP-FUN-0023","Funda tipo 10","Fundas","funda",["1cZPcgDet8-kc0EwPlV-45cRLkh_oI-dh"]],["TP-FUN-0024","Funda para cabezal de cargador","Fundas","normal",["1p3HAkM561dqtaNV-72d9bm-6G0I-ZaGZ","1imiEH7V6ELb2Wd1YXQ1co0hCrWrhr0gE"]]];
+var TP_CATS = ['Audífonos', 'Apple Pencil', 'Cables', 'Baterías', 'Fundas'];
+var TP_DATA = { nit: '1110546470-2', tel: '3167019091', wa: '3167019091', dir: 'Centro Comercial Los Panches, local 202, segundo piso', ciudad: 'Ibagué, Tolima' };
+function ytSeedTP() {
+  const c = S.config; if (!c || c.tpSeed) return false;
+  let n = 0;
+  TP_SEED.forEach(function (r) {
+    const code = r[0];
+    if (S.products.some(p => String(p.code || '').toUpperCase() === code)) return;
+    const urls = r[4].map(id => 'https://drive.google.com/thumbnail?id=' + id + '&sz=w800');
+    const p = { id: uid('pr'), code: code, name: r[1], category: r[2], brand: '', barcode: '', presentation: 'Unidad', pack: 1, tarifa: 'EXENTO', iva: 0,
+      cost: 0, price: 0, price2: 0, price3: 0, stock: 1, min: 1, sold: 0, createdAt: nowISO(), updatedAt: nowISO(), supplier: '', tipo: r[3], imgUrl: urls[0],
+      colores: urls.length > 1 ? urls.map((u, i) => ({ n: 'Color ' + (i + 1), url: u })) : [], webDesc: '' };
+    v8Ensure(p); S.products.push(p); n++;
+    try { kardexLog(p.id, 'inicial', 1, '', 'Existencia inicial', 0); } catch (e) { }
+  });
+  c.categorias = Array.from(new Set(TP_CATS.concat(S.products.map(p => p.category).filter(Boolean))));
+  c.prefijoSKU = 'TP'; S.counters.SKU = Math.max(S.counters.SKU || 0, TP_SEED.length);
+  c.tpSeed = 1; save('products', 'config', 'counters', 'kardex');
+  try { v8Sync(); } catch (e) { } try { render(); } catch (e) { }
+  return n;
+}
 function ytBrandMigrate() {
   try {
-    const c = S && S.config; if (!c || c.tpBrand) return;
-    if (/yossa/i.test(String(c.biz || ''))) {
-      c.biz = 'Tecno Phone'; c.sub = 'Tecnología · Accesorios · Servicio técnico'; c.ciudad = 'Ibagué, Tolima';
-      /* solo se borran los datos que siguen siendo exactamente los de la plantilla anterior */
-      const old = { nit: '1106789980-5', tel: '3248960999', dir: 'Cr 9 #7-36 Centro', wa: '3223980005', rep_legal: 'Karool Julieth Gutiérrez Manrique', actividad: '4741 / 9512' };
-      Object.keys(old).forEach(k => { if (c[k] === old[k]) c[k] = ''; });
-      if (c.fiscal && /yossa/i.test(String(c.fiscal.centroCosto || ''))) c.fiscal.centroCosto = 'TECNO PHONE';
-      if (c.theme && c.theme.c1 === '#0F3B2D') c.theme = { c1: '#1B2126', c2: '#0E93A5', c3: '#19C1D6' };
+    const c = S && S.config; if (!c) return;
+    if (!c.tpBrand || c.tpBrand < 2) {
+      if (/yossa/i.test(String(c.biz || ''))) {
+        c.biz = 'Tecno Phone'; c.sub = 'Tecnología · Accesorios · Servicio técnico';
+        /* solo se borran los datos que siguen siendo exactamente los de la plantilla anterior */
+        const old = { nit: '1106789980-5', tel: '3248960999', dir: 'Cr 9 #7-36 Centro', wa: '3223980005', rep_legal: 'Karool Julieth Gutiérrez Manrique', actividad: '4741 / 9512' };
+        Object.keys(old).forEach(k => { if (c[k] === old[k]) c[k] = ''; });
+        if (c.fiscal && /yossa/i.test(String(c.fiscal.centroCosto || ''))) c.fiscal.centroCosto = 'TECNO PHONE';
+        if (c.theme && c.theme.c1 === '#0F3B2D') c.theme = { c1: '#1B2126', c2: '#0E93A5', c3: '#19C1D6' };
+      }
+      /* datos reales de Tecno Phone (solo donde esté vacío o con la ciudad anterior) */
+      Object.keys(TP_DATA).forEach(k => { if (!c[k] || (k === 'ciudad' && /chaparral/i.test(c[k]))) c[k] = TP_DATA[k]; });
+      c.tpBrand = 2; save('config');
+      try { applyTheme(); } catch (e) { }
     }
-    c.tpBrand = 1; save('config');
-    try { applyTheme(); } catch (e) { } try { v8Sync(); } catch (e) { } try { render(); } catch (e) { }
+    ytSeedTP();
+    try { v8Sync(); } catch (e) { } try { render(); } catch (e) { }
   } catch (e) { console.warn('brand', e); }
 }
 (function () {
