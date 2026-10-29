@@ -55,7 +55,7 @@ a{color:inherit}
 .brand .logo{object-fit:cover;background:#fff}
 .brand .mono{background:linear-gradient(160deg,#24414B,#1B2126);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600}
 .brand .wordmark{height:44px;width:auto;display:block}
-.hero-logo{display:block;height:58px;width:auto;margin:0 0 18px;filter:invert(1) drop-shadow(0 6px 18px rgba(0,0,0,.35))}
+.hero-logo{display:block;height:58px;width:auto;margin:0 0 18px;filter:none drop-shadow(0 6px 18px rgba(0,0,0,.35))}
 .brand b{font-size:17px;font-weight:600;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar .sp{flex:1}
 a.icon-btn{text-decoration:none}
@@ -477,7 +477,7 @@ async function load(silent) {
   } catch (e) { err = e; }
   if (!cat && ST.loaded && !ST.fallback) { console.warn('Catálogo:', err); return; }   /* fallo pasajero: se conservan los datos reales ya cargados */
   try {
-    const data = cat ? cat.data : FALLBACK;
+    const data = FALLBACK; /* SIEMPRE usar fotos procesadas sin fondo */
     ST.items = normalize(data);
     ST.site = brandSite((data && data.site) || {});
     ST.at = cat ? ((data && data.at) || '') : '';

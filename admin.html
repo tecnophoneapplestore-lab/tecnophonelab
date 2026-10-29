@@ -6137,7 +6137,7 @@ function ytBgAuto() {
     if (typeof perfil === 'function' && perfil() !== 'gerencia') return;
     if (!ytBgPending().length) return;
     const lf = Number(localStorage.getItem('yt_bg_fail') || 0); if (lf && Date.now() - lf < 6 * 36e5) return;
-    ytBgState.autoDone = true; ytBgAll(); setTimeout(ytBgRun, 500);
+    ytBgState.autoDone = true; return; /* desactivado: fotos ya procesadas */
   } catch (e) { console.warn('auto fondo', e); }
 }
 (function () {
