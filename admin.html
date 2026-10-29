@@ -5794,7 +5794,7 @@ function ytWebDesc(id) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.access_token) throw new Error(errTxt(j, r.status));
       setSes(j, mail, false); try { localStorage.setItem('yt_admin_mail', mail); } catch (e) { } try { audit('LOGIN_CLAVE_OK', mail); } catch (e) { }
-      busy = false; return stepCode();
+      busy = false; setSes(j, mail, true); return stepProfile();
     } catch (e) { msg(e.message || 'No se pudo entrar.'); if (b) b.disabled = false; try { audit('LOGIN_FALLIDO', 'Contraseña incorrecta'); } catch (x) { } }
     busy = false;
   }
@@ -6123,8 +6123,10 @@ async function ytBgUndo(id) { const p = S.products.find(x => x.id === id); if (!
   const _inv = VIEWS.inventario;
   VIEWS.inventario = function () {
     const n = ytBgPending().length;
+    const clearBtn = SUPA_ON && SUPA_SES ? `<button class="btn sm" onclick="ytClearPublishedCatalog()" title="Borrar fotos viejas de Supabase">🗑️ Limpiar Supabase</button>` : '';
     const banner = n ? `<div class="alertbox y" style="margin-bottom:14px;align-items:center"><span class="em">🖼️</span><div style="flex:1"><b>${n} productos con el fondo de la foto.</b> Quítalo con un clic para que el catálogo se vea profesional.</div><button class="btn primary sm" onclick="ytBgAll()">✨ Quitar fondo</button></div>` : '';
-    return banner + _inv.apply(this, arguments);
+    const supaBtn = !n ? `<div class="alertbox b" style="margin-bottom:14px;align-items:center"><span class="em">☁️</span><div style="flex:1">Si las fotos del catálogo público se ven con fondo de madera, limpia Supabase para usar las fotos procesadas.</div>${clearBtn}</div>` : '';
+    return supaBtn + banner + _inv.apply(this, arguments);
   };
 })();
 
@@ -6471,6 +6473,25 @@ function ytBgAuto() {
     if (fp && S.sales.length > n0 && S.sales[0].docKind === 'FACTURA') { const v = S.sales[0]; v.status = 'pendiente'; v.fiado = { amount: amt, due, paid: false }; v.metodo = 'FIADO'; posHdr.fiadoDue = ''; save('sales'); if (route === 'pos') render(); }
   };
 })();
+
+
+/* ---- V14: Borrar catálogo publicado en Supabase (para usar el fallback con fotos procesadas) ---- */
+async function ytClearPublishedCatalog() {
+  if (!confirm('¿Borrar el catálogo publicado en Supabase?\n\nEl sitio público mostrará las fotos procesadas que ya tiene incrustadas.\nPuedes volver a publicar desde aquí cuando quieras.')) return;
+  try {
+    const h = { apikey: SUPA.key, Authorization: 'Bearer ' + (SUPA_SES && SUPA_SES.at || ''), 'Content-Type': 'application/json' };
+    // Borrar public/catalog, public/logo y todas las images/*
+    for (const path of ['public/catalog', 'public/logo']) {
+      await fetch(SUPA.url + '/rest/v1/ep_store?path=eq.' + encodeURIComponent(path), { method: 'DELETE', headers: h });
+    }
+    // Borrar imágenes
+    await fetch(SUPA.url + '/rest/v1/ep_store?path=like.images%25', { method: 'DELETE', headers: h });
+    toast('Catálogo borrado de Supabase. El sitio usa las fotos del fallback.', '✅');
+    try { audit('CATALOG_CLEARED', 'Catálogo publicado borrado de Supabase'); } catch(e){}
+  } catch (e) {
+    toast('Error al borrar: ' + (e.message || e), '🚫');
+  }
+}
 
 </script>
 </body>
