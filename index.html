@@ -477,7 +477,7 @@ async function load(silent) {
   } catch (e) { err = e; }
   if (!cat && ST.loaded && !ST.fallback) { console.warn('Catálogo:', err); return; }   /* fallo pasajero: se conservan los datos reales ya cargados */
   try {
-    const data = FALLBACK; /* SIEMPRE usar fotos procesadas sin fondo */
+    const data = cat ? cat.data : FALLBACK;
     ST.items = normalize(data);
     ST.site = brandSite((data && data.site) || {});
     ST.at = cat ? ((data && data.at) || '') : '';
