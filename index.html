@@ -445,7 +445,7 @@ const ST_TXT = { ok: 'Disponible', low: 'Últimas unidades', out: 'Agotado' };
 function normalize(raw) {
   const items = Object.entries((raw && raw.items) || {}).map(([key, p]) => ({
     key, id: p.id || key, name: String(p.name || '').trim(), cat: p.cat || 'Otros', price: Number(p.price) || 0,
-    stock: Number(p.stock) || 0, agotado: !!p.agotado, sinInv: !!p.sinInv, hidden: !!p.hidden,
+    stock: Number(p.stock) || 0, agotado: !!p.agotado, sinInv: (p.sinInv !== undefined ? !!p.sinInv : (p.stock === undefined || p.stock === null)), hidden: !!p.hidden,
     img: p.img || '', hasImg: !!p.hasImg, ref: p.ref || key, brand: p.brand || '', desc: String(p.desc || '').trim(),
     tipo: p.tipo || 'normal', sub: p.sub || '', nobg: !!p.nobg,
     colores: (p.colores || []).filter(c => c && c.n),
